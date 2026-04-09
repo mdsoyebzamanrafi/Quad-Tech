@@ -1,6 +1,6 @@
-# Tiger-Tech E-Commerce Application
+# Quad Tech E-Commerce Application
 
-Tiger-Tech is a full-stack MERN (MongoDB, Express, React, Node.js) e-commerce web application. 
+Quad Tech is a full-stack MERN (MongoDB, Express, React, Node.js) e-commerce web application. 
 
 This repository contains both the React frontend and the Express backend, structured to provide a scalable and maintainable e-commerce solution with dynamic UI, product management, cart functionality, and database integration.
 
