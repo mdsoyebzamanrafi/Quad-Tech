@@ -117,4 +117,32 @@ const createProduct = async (req, res) => {
     }
 };
 
-export { getProducts, getProductById, createProductReview, createProduct };
+// @desc    Get product suggestions
+// @route   GET /api/products/search/suggestions
+// @access  Public
+const getProductSuggestions = async (req, res) => {
+    try {
+        const { q } = req.query;
+        if (!q) return res.json([]);
+
+        const products = await Product.find({
+            $or: [
+                { name: { $regex: q, $options: 'i' } },
+                { category: { $regex: q, $options: 'i' } }
+            ]
+        }).select('name category').limit(10);
+
+        // Extract names and categories and deduplicate
+        const suggestions = new Set();
+        products.forEach(p => {
+            if (p.name.toLowerCase().includes(q.toLowerCase())) suggestions.add(p.name);
+            if (p.category.toLowerCase().includes(q.toLowerCase())) suggestions.add(p.category);
+        });
+
+        res.json(Array.from(suggestions).slice(0, 8));
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+export { getProducts, getProductById, createProductReview, createProduct, getProductSuggestions };

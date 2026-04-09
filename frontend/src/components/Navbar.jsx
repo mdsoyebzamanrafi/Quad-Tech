@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ShoppingCart, User, Search, Sun, Moon, LogOut, Package, Menu, X } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
+import api from '../utils/api';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
@@ -13,22 +14,67 @@ const Navbar = () => {
     const navigate = useNavigate();
     const [dropdownOpen, setDropdownOpen] = useState(false);
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const [keyword, setKeyword] = useState('');
+    const [suggestions, setSuggestions] = useState([]);
+    const [showSuggestions, setShowSuggestions] = useState(false);
     const dropdownRef = React.useRef(null);
+    const searchRef = React.useRef(null);
 
     React.useEffect(() => {
         const handleClickOutside = (event) => {
             if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
                 setDropdownOpen(false);
             }
+            if (searchRef.current && !searchRef.current.contains(event.target)) {
+                setShowSuggestions(false);
+            }
         };
         document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
+    // Fetch suggestions as user types (debounced)
+    React.useEffect(() => {
+        const delayDebounceFn = setTimeout(async () => {
+            if (keyword.trim().length > 1) {
+                try {
+                    const { data } = await api.get(`/api/products/search/suggestions?q=${keyword}`);
+                    setSuggestions(data);
+                    setShowSuggestions(true);
+                } catch (error) {
+                    console.error('Suggestions fetch error:', error);
+                }
+            } else {
+                setSuggestions([]);
+                setShowSuggestions(false);
+            }
+        }, 300);
+
+        return () => clearTimeout(delayDebounceFn);
+    }, [keyword]);
+
     const logoutHandler = () => {
         logout();
         navigate('/login');
     };
+
+    const submitHandler = (e) => {
+        if (e) e.preventDefault();
+        if (keyword.trim()) {
+            navigate(`/?keyword=${keyword}`);
+            setShowSuggestions(false);
+        } else {
+            navigate('/');
+        }
+    };
+
+    const suggestionClickHandler = (sug) => {
+        setKeyword(sug);
+        setShowSuggestions(false);
+        navigate(`/?keyword=${sug}`);
+    };
+
+    const defaultKeywords = ['Smartphones', 'Laptops', 'Wearables', 'Gaming', 'Audio'];
 
     return (
         <header className="navbar-container glass">
@@ -59,14 +105,36 @@ const Navbar = () => {
                     <button onClick={() => setIsSidebarOpen(true)} className="menu-btn" aria-label="Open Categories">
                         <Menu size={24} color="var(--text-main)" />
                     </button>
-                    <Link to="/">
+                    <Link to="/" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
                         <h2>Quad <span className="text-gradient">Tech</span></h2>
                     </Link>
                 </div>
 
-                <div className="search-bar">
-                    <Search size={18} className="search-icon" />
-                    <input type="text" placeholder="Search for luxury..." />
+                <div className="search-container" ref={searchRef}>
+                    <form onSubmit={submitHandler} className="search-bar">
+                        <Search size={18} className="search-icon" />
+                        <input 
+                            type="text" 
+                            placeholder="Search for luxury..." 
+                            value={keyword}
+                            onChange={(e) => setKeyword(e.target.value)}
+                            onFocus={() => keyword.trim().length > 1 && setShowSuggestions(true)}
+                        />
+                    </form>
+                    {showSuggestions && suggestions.length > 0 && (
+                        <div className="search-suggestions glass animate-fade-in">
+                            {suggestions.map((sug, index) => (
+                                <div 
+                                    key={index} 
+                                    className="suggestion-item"
+                                    onClick={() => suggestionClickHandler(sug)}
+                                >
+                                    <Search size={14} className="sug-icon" />
+                                    <span>{sug}</span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
 
                 <nav className="nav-links">
