@@ -202,10 +202,29 @@ const Navbar = () => {
                             placeholder="Search Quad Tech..." 
                             value={keyword}
                             onChange={(e) => setKeyword(e.target.value)}
+                            onFocus={() => keyword.trim().length > 1 && setShowSuggestions(true)}
                             autoFocus
                         />
                         <button type="submit" className="mobile-search-submit"><Search size={18} /></button>
                     </form>
+                    
+                    {showSuggestions && suggestions.length > 0 && (
+                        <div className="search-suggestions glass animate-fade-in" style={{ position: 'relative', marginTop: '10px' }}>
+                            {suggestions.map((sug, index) => (
+                                <div 
+                                    key={index} 
+                                    className="suggestion-item"
+                                    onClick={() => { 
+                                        setIsMobileSearchOpen(false); 
+                                        suggestionClickHandler(sug); 
+                                    }}
+                                >
+                                    <Search size={14} className="sug-icon" />
+                                    <span>{sug}</span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
             )}
         </header>

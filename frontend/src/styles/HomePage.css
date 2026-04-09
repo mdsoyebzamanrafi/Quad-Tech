@@ -3,6 +3,8 @@
     flex-direction: column;
     gap: 6rem;
     padding-bottom: 4rem;
+    overflow-x: hidden;
+    max-width: 100vw;
 }
 
 /* Animation Utilities for react-intersection-observer */
@@ -197,13 +199,20 @@
 
 @media (max-width: 480px) {
     .products-grid {
-        grid-template-columns: repeat(2, 1fr);
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 0.5rem;
+        width: 100%;
+        max-width: 100%;
+        box-sizing: border-box;
     }
     .product-card {
         padding: 0.5rem;
         border-radius: 12px;
-        min-width: 0; /* Prevents flex/grid blowouts */
+        min-width: 0;
+        width: 100%;
+        box-sizing: border-box;
+        overflow: hidden;
     }
     .product-info h3 {
         font-size: 0.85rem;
@@ -396,7 +405,7 @@
 /* Mobile Hero Padding */
 @media (max-width: 480px) {
     .hero-section {
-        padding-top: 6rem;
-        padding-bottom: 6rem;
+        padding-top: 4rem;
+        padding-bottom: 4rem;
     }
 }
