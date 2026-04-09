@@ -180,3 +180,31 @@
     background: #1e1f20;
     border-color: #515451;
 }
+
+.dark .btn-google-custom:active {
+    background: #333333;
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+}
+
+/* Mobile Responsiveness for Auth Forms */
+@media (max-width: 480px) {
+    .login-container {
+        padding: 1.5rem 0.5rem;
+    }
+    
+    .login-card {
+        padding: 2rem 1.5rem;
+    }
+    
+    .login-title {
+        font-size: 2rem;
+    }
+
+    /* Target reCAPTCHA wrapper directly to ensure it scales down instead of overflowing */
+    .g-recaptcha, 
+    .g-recaptcha > div {
+        transform: scale(0.9);
+        transform-origin: 0 0;
+        margin: 0 auto;
+    }
+}
