@@ -38,10 +38,40 @@
 @media (max-width: 800px) {
     .product-details-grid {
         grid-template-columns: 1fr;
+        gap: 2rem;
     }
 
     .product-action-box {
         grid-column: span 1;
+    }
+}
+
+@media (max-width: 480px) {
+    .product-details-container {
+        padding: 1.5rem 0;
+        gap: 1.5rem;
+    }
+
+    .product-image-box {
+        padding: 1.5rem;
+        border-radius: 20px;
+    }
+
+    .product-title {
+        font-size: clamp(1.8rem, 6vw, 2.2rem);
+    }
+
+    .price-tag {
+        font-size: 2.2rem;
+    }
+    
+    .action-row {
+        padding-bottom: 0.8rem;
+    }
+    
+    .btn-full {
+        padding: 1rem;
+        font-size: 1.05rem;
     }
 }
 

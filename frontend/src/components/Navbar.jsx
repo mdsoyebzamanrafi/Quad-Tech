@@ -17,6 +17,7 @@ const Navbar = () => {
     const [keyword, setKeyword] = useState('');
     const [suggestions, setSuggestions] = useState([]);
     const [showSuggestions, setShowSuggestions] = useState(false);
+    const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
     const dropdownRef = React.useRef(null);
     const searchRef = React.useRef(null);
 
@@ -110,7 +111,7 @@ const Navbar = () => {
                     </Link>
                 </div>
 
-                <div className="search-container" ref={searchRef}>
+                <div className="search-container desktop-search" ref={searchRef}>
                     <form onSubmit={submitHandler} className="search-bar">
                         <Search size={18} className="search-icon" />
                         <input 
@@ -138,6 +139,14 @@ const Navbar = () => {
                 </div>
 
                 <nav className="nav-links">
+                    <button 
+                        onClick={() => setIsMobileSearchOpen(!isMobileSearchOpen)} 
+                        className="mobile-search-toggle" 
+                        aria-label="Toggle Search"
+                    >
+                        {isMobileSearchOpen ? <X size={20} /> : <Search size={20} />}
+                    </button>
+                    
                     <button onClick={toggleTheme} className="theme-toggle" aria-label="Toggle Theme">
                         {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
                     </button>
@@ -180,6 +189,25 @@ const Navbar = () => {
                     </Link>
                 </nav>
             </div>
+            
+            {/* Mobile Search Dropdown */}
+            {isMobileSearchOpen && (
+                <div className="mobile-search-container glass animate-fade-in">
+                    <form 
+                        onSubmit={(e) => { setIsMobileSearchOpen(false); submitHandler(e); }} 
+                        className="mobile-search-bar"
+                    >
+                        <input 
+                            type="text" 
+                            placeholder="Search Quad Tech..." 
+                            value={keyword}
+                            onChange={(e) => setKeyword(e.target.value)}
+                            autoFocus
+                        />
+                        <button type="submit" className="mobile-search-submit"><Search size={18} /></button>
+                    </form>
+                </div>
+            )}
         </header>
     );
 };

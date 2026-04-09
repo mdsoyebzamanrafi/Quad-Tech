@@ -145,6 +145,62 @@
     color: var(--color-accent-1);
 }
 
+.mobile-search-toggle {
+    display: none; /* Hidden on desktop */
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    color: var(--text-main);
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    transition: all 0.2s ease;
+}
+
+.mobile-search-toggle:hover {
+    background-color: var(--border-color);
+}
+
+.mobile-search-container {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    padding: 1rem 2rem;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+    box-shadow: var(--shadow-md);
+    z-index: 999;
+}
+
+.mobile-search-bar {
+    display: flex;
+    align-items: center;
+    background-color: var(--bg-primary);
+    border-radius: 9999px;
+    padding: 0.75rem 1.5rem;
+    border: 1px solid var(--border-color);
+}
+
+.mobile-search-bar input {
+    flex: 1;
+    border: none;
+    background: transparent;
+    outline: none;
+    font-size: 1rem;
+    color: var(--text-main);
+    font-family: inherit;
+}
+
+.mobile-search-submit {
+    color: var(--color-accent-1);
+    margin-left: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
 .nav-cart {
     padding: 0.6rem 1.2rem;
 }
@@ -339,4 +395,33 @@
 
 .dropdown-item:hover svg {
     color: var(--color-accent-1);
+}
+
+/* Responsive Navbar Adjustments */
+@media (max-width: 900px) {
+    .nav-cart span {
+        display: none;
+    }
+}
+
+@media (max-width: 768px) {
+    .desktop-search {
+        display: none; /* Hide the large center search bar */
+    }
+    
+    .mobile-search-toggle {
+        display: flex; /* Show the search button */
+    }
+    
+    .nav-links {
+        gap: 1rem;
+    }
+    
+    .navbar {
+        padding: 1rem;
+    }
+    
+    .logo h2 {
+        font-size: 1.5rem;
+    }
 }
