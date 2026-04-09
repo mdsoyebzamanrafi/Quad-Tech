@@ -106,7 +106,7 @@ const Navbar = () => {
                     <button onClick={() => setIsSidebarOpen(true)} className="menu-btn" aria-label="Open Categories">
                         <Menu size={24} color="var(--text-main)" />
                     </button>
-                    <Link to="/" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
+                    <Link to="/">
                         <h2>Quad <span className="text-gradient">Tech</span></h2>
                     </Link>
                 </div>

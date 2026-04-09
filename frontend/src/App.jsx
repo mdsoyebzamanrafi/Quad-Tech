@@ -1,6 +1,7 @@
 import React from 'react';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import ScrollToTop from './components/ScrollToTop';
 import Layout from './components/Layout';
 import HomePage from './pages/HomePage';
 import ProductDetails from './pages/ProductDetails';
@@ -59,6 +60,7 @@ function App() {
     <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID || 'fallback-id'}>
       <ThemeProvider>
         <Router>
+          <ScrollToTop />
           <AppContent />
         </Router>
       </ThemeProvider>
