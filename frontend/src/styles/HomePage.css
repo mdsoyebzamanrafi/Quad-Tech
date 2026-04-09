@@ -392,3 +392,11 @@
     font-size: 1.2rem;
     margin-bottom: 2rem;
 }
+
+/* Mobile Hero Padding */
+@media (max-width: 480px) {
+    .hero-section {
+        padding-top: 6rem;
+        padding-bottom: 6rem;
+    }
+}
