@@ -424,4 +424,44 @@
     .logo h2 {
         font-size: 1.5rem;
     }
+    
+    /* Hide 'Sign In' or username text on mobile */
+    .nav-text {
+        display: none;
+    }
+    
+    /* Floating Mobile Cart Button */
+    .nav-cart {
+        position: fixed;
+        bottom: 24px;
+        right: 24px;
+        z-index: 1000;
+        width: 65px;
+        height: 65px;
+        padding: 0;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 10px 25px rgba(236, 72, 153, 0.4);
+    }
+    
+    .nav-cart span {
+        display: none;
+    }
+    
+    .nav-cart svg {
+        width: 26px;
+        height: 26px;
+    }
+    
+    .cart-badge {
+        position: absolute;
+        top: 0;
+        right: 0;
+        margin-left: 0;
+        transform: translate(10%, -10%);
+        width: 24px;
+        height: 24px;
+    }
 }
