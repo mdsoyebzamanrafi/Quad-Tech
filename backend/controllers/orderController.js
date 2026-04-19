@@ -1,117 +1,106 @@
-import Order from '../models/Order.js';
-import Product from '../models/Product.js';
+import asyncHandler from '../utils/asyncHandler.js';
+import {
+    createOrder,
+    listMyOrders,
+    getOrderForUser,
+    cancelMyOrder,
+    markOrderAsReceived,
+    listOrdersForAdmin,
+    getOrderForAdmin,
+    updateOrderStatusByAdmin,
+    updatePaymentStatusByAdmin,
+    updateAdminNote,
+} from '../services/orderService.js';
 
-// @desc    Create new order
-// @route   POST /api/orders
-// @access  Private
-const addOrderItems = async (req, res) => {
-    try {
-        const {
-            orderItems,
-            shippingAddress,
-            paymentMethod,
-            itemsPrice,
-            taxPrice,
-            shippingPrice,
-            totalPrice,
-        } = req.body;
+const placeOrder = asyncHandler(async (req, res) => {
+    const order = await createOrder({ authenticatedUser: req.user, payload: req.body });
+    res.status(201).json(order);
+});
 
-        if (orderItems && orderItems.length === 0) {
-            res.status(400).json({ message: 'No order items' });
-            return;
-        } else {
-            const order = new Order({
-                orderItems,
-                user: req.user._id,
-                shippingAddress,
-                paymentMethod,
-                itemsPrice,
-                taxPrice,
-                shippingPrice,
-                totalPrice,
-                isPaid: true,
-                paidAt: Date.now(),
-            });
+const getMyOrders = asyncHandler(async (req, res) => {
+    const orders = await listMyOrders({ requester: req.user });
+    res.json(orders);
+});
 
-            const createdOrder = await order.save();
+const getMyOrderDetails = asyncHandler(async (req, res) => {
+    const order = await getOrderForUser({ orderId: req.params.id, requester: req.user });
+    res.json(order);
+});
 
-            // Update Stock
-            for (const item of orderItems) {
-                const product = await Product.findById(item.product);
-                if (product) {
-                    product.countInStock = product.countInStock - item.qty;
-                    await product.save();
-                }
-            }
+const cancelOwnOrder = asyncHandler(async (req, res) => {
+    const order = await cancelMyOrder({
+        orderId: req.params.id,
+        requester: req.user,
+        reason: req.body?.reason,
+    });
 
-            res.status(201).json(createdOrder);
-        }
-    } catch (error) {
-        res.status(500).json({ message: error.message });
-    }
+    res.json(order);
+});
+
+// Backward-compatible endpoint used by current frontend.
+const markOwnOrderAsReceived = asyncHandler(async (req, res) => {
+    const order = await markOrderAsReceived({ orderId: req.params.id, requester: req.user });
+    res.json(order);
+});
+
+// Backward-compatible endpoint: customer can fetch own order; admin can fetch any.
+const getOrderById = asyncHandler(async (req, res) => {
+    const order = await getOrderForUser({ orderId: req.params.id, requester: req.user });
+    res.json(order);
+});
+
+const getAllOrdersAdmin = asyncHandler(async (req, res) => {
+    const result = await listOrdersForAdmin({ filters: req.query });
+    res.json(result);
+});
+
+const getOrderByIdAdmin = asyncHandler(async (req, res) => {
+    const order = await getOrderForAdmin({ orderId: req.params.id, includeAuditTrail: true });
+    res.json(order);
+});
+
+const updateOrderStatusAdmin = asyncHandler(async (req, res) => {
+    const order = await updateOrderStatusByAdmin({
+        orderId: req.params.id,
+        newStatus: req.body.orderStatus,
+        actor: req.user,
+        note: req.body.note,
+    });
+
+    res.json(order);
+});
+
+const updatePaymentStatusAdmin = asyncHandler(async (req, res) => {
+    const order = await updatePaymentStatusByAdmin({
+        orderId: req.params.id,
+        newStatus: req.body.paymentStatus,
+        actor: req.user,
+        note: req.body.note,
+    });
+
+    res.json(order);
+});
+
+const updateAdminNoteController = asyncHandler(async (req, res) => {
+    const order = await updateAdminNote({
+        orderId: req.params.id,
+        note: req.body.adminNote,
+        actor: req.user,
+    });
+
+    res.json(order);
+});
+
+export {
+    placeOrder,
+    getMyOrders,
+    getMyOrderDetails,
+    cancelOwnOrder,
+    markOwnOrderAsReceived,
+    getOrderById,
+    getAllOrdersAdmin,
+    getOrderByIdAdmin,
+    updateOrderStatusAdmin,
+    updatePaymentStatusAdmin,
+    updateAdminNoteController,
 };
-
-// @desc    Get order by ID
-// @route   GET /api/orders/:id
-// @access  Private
-const getOrderById = async (req, res) => {
-    try {
-        const order = await Order.findById(req.params.id).populate(
-            'user',
-            'name email'
-        );
-
-        if (order) {
-            res.json(order);
-        } else {
-            res.status(404).json({ message: 'Order not found' });
-        }
-    } catch (error) {
-        if (error.kind === 'ObjectId') {
-            return res.status(404).json({ message: 'Order not found' });
-        }
-        res.status(500).json({ message: error.message });
-    }
-};
-
-// @desc    Get logged in user orders
-// @route   GET /api/orders/myorders
-// @access  Private
-const getMyOrders = async (req, res) => {
-    try {
-        const orders = await Order.find({ user: req.user._id });
-        res.json(orders);
-    } catch (error) {
-        res.status(500).json({ message: error.message });
-    }
-};
-
-// @desc    Update order to delivered (received by user)
-// @route   PUT /api/orders/:id/deliver
-// @access  Private
-const markOrderAsReceived = async (req, res) => {
-    try {
-        const order = await Order.findById(req.params.id);
-
-        if (order) {
-            // Verify order belongs to user
-            if (order.user.toString() !== req.user._id.toString()) {
-                res.status(401);
-                throw new Error('Not authorized to access this order');
-            }
-
-            order.isDelivered = true;
-            order.deliveredAt = Date.now();
-
-            const updatedOrder = await order.save();
-            res.json(updatedOrder);
-        } else {
-            res.status(404);
-            throw new Error('Order not found');
-        }
-    } catch (error) {
-        res.status(500).json({ message: error.message });
-    }
-};
-
-export { addOrderItems, getOrderById, getMyOrders, markOrderAsReceived };

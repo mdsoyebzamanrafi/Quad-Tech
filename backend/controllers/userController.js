@@ -1,8 +1,22 @@
 import crypto from 'crypto';
+import { OAuth2Client } from 'google-auth-library';
 import User from '../models/User.js';
 import generateToken from '../utils/generateToken.js';
 import sendEmail from '../utils/sendEmail.js';
-import { OAuth2Client } from 'google-auth-library';
+import asyncHandler from '../utils/asyncHandler.js';
+import ApiError from '../errors/ApiError.js';
+import {
+    USER_ROLES,
+    USER_STATUSES,
+} from '../constants/domainConstants.js';
+import {
+    sanitizeUser,
+    listUsersForAdmin,
+    getUserAdminDetails,
+    updateUserStatusByAdmin,
+    updateUserRoleBySuperAdmin,
+    softDeleteUserByAdmin,
+} from '../services/userAdminService.js';
 
 const verifyRecaptcha = async (token) => {
     if (process.env.NODE_ENV === 'test') return true;
@@ -19,310 +33,362 @@ const verifyRecaptcha = async (token) => {
     const outcome = await response.json();
     return outcome.success;
 };
-// @desc    Auth user & get token
-// @route   POST /api/users/login
-// @access  Public
-const authUser = async (req, res) => {
-    try {
-        const { email, password, captchaToken } = req.body;
 
-        const isHuman = await verifyRecaptcha(captchaToken);
-        if (!isHuman) {
-            return res.status(400).json({ message: 'CAPTCHA verification failed. Please try again.' });
-        }
+const ensureUserCanAuthenticate = (user) => {
+    if (!user) {
+        throw new ApiError(401, 'Invalid email or password');
+    }
 
-        const user = await User.findOne({ email });
+    if (user.status === USER_STATUSES.BLOCKED) {
+        throw new ApiError(403, 'Account is blocked');
+    }
 
-        if (user && (await user.matchPassword(password))) {
-            const token = generateToken(res, user._id);
-
-            res.json({
-                _id: user._id,
-                name: user.name,
-                email: user.email,
-                isAdmin: user.isAdmin,
-                token
-            });
-        } else {
-            res.status(401).json({ message: 'Invalid email or password' });
-        }
-    } catch (error) {
-        res.status(500).json({ message: error.message });
+    if (user.status === USER_STATUSES.DELETED || user.deletedAt) {
+        throw new ApiError(403, 'Account is deleted');
     }
 };
 
-// @desc    Register a new user & send OTP
-// @route   POST /api/users
-// @access  Public
-const registerUser = async (req, res) => {
-    try {
-        const { name, email, password, captchaToken } = req.body;
+const buildAuthResponse = (user, token, extra = {}) => ({
+    _id: user._id,
+    name: user.name,
+    email: user.email,
+    phone: user.phone,
+    role: user.role,
+    status: user.status,
+    isAdmin: user.role === USER_ROLES.ADMIN || user.role === USER_ROLES.SUPER_ADMIN,
+    lastLogin: user.lastLogin,
+    token,
+    ...extra,
+});
 
-        const isHuman = await verifyRecaptcha(captchaToken);
-        if (!isHuman) {
-            return res.status(400).json({ message: 'CAPTCHA verification failed. Please try again.' });
-        }
+const authUser = asyncHandler(async (req, res) => {
+    const { email, password, captchaToken } = req.body;
 
-        let user = await User.findOne({ email });
-
-        if (user && user.isVerified) {
-            return res.status(400).json({ message: 'User already exists' });
-        }
-
-        const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
-        const otpExpire = Date.now() + 10 * 60 * 1000; // 10 minutes
-
-        if (user && !user.isVerified) {
-            // Update unverified user with new OTP
-            user.name = name;
-            user.password = password;
-            user.otpCode = otpCode;
-            user.otpExpire = otpExpire;
-            await user.save();
-        } else {
-            // Create brand new unverified user
-            user = await User.create({
-                name,
-                email,
-                password,
-                otpCode,
-                otpExpire,
-                isVerified: false
-            });
-        }
-
-        // Send OTP via Email
-        const message = `
-            <h1>Welcome to Quad Tech!</h1>
-            <p>Your email verification code is: <strong>${otpCode}</strong></p>
-            <p>This code will expire in 10 minutes.</p>
-        `;
-
-        try {
-            await sendEmail({
-                email: user.email,
-                subject: 'Quad Tech - Email Verification Code',
-                message
-            });
-
-            res.status(200).json({ status: 'pending_verification', email: user.email });
-        } catch (error) {
-            console.error('Nodemailer Error:', error);
-            user.otpCode = undefined;
-            user.otpExpire = undefined;
-            await user.save();
-            return res.status(500).json({ message: 'Email could not be sent' });
-        }
-    } catch (error) {
-        res.status(500).json({ message: error.message });
+    const isHuman = await verifyRecaptcha(captchaToken);
+    if (!isHuman) {
+        throw new ApiError(400, 'CAPTCHA verification failed. Please try again.');
     }
-};
 
-// @desc    Verify OTP Code
-// @route   POST /api/users/verify
-// @access  Public
-const verifyOTP = async (req, res) => {
+    const user = await User.findOne({ email: email?.toLowerCase() }).select('+password');
+    ensureUserCanAuthenticate(user);
+
+    if (!user.isVerified) {
+        throw new ApiError(403, 'Email verification is required before login');
+    }
+
+    const isMatch = await user.matchPassword(password);
+    if (!isMatch) {
+        throw new ApiError(401, 'Invalid email or password');
+    }
+
+    user.lastLogin = new Date();
+    await user.save();
+
+    const token = generateToken(res, user._id);
+    res.json(buildAuthResponse(user, token));
+});
+
+const registerUser = asyncHandler(async (req, res) => {
+    const { name, email, password, captchaToken, phone } = req.body;
+
+    const isHuman = await verifyRecaptcha(captchaToken);
+    if (!isHuman) {
+        throw new ApiError(400, 'CAPTCHA verification failed. Please try again.');
+    }
+
+    if (!name || !email || !password) {
+        throw new ApiError(400, 'Name, email, and password are required');
+    }
+
+    let user = await User.findOne({ email: email.toLowerCase() }).select('+password');
+
+    if (user && user.status === USER_STATUSES.DELETED) {
+        throw new ApiError(400, 'This account is deleted and cannot be re-registered');
+    }
+
+    if (user && user.isVerified) {
+        throw new ApiError(400, 'User already exists');
+    }
+
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpExpire = Date.now() + 10 * 60 * 1000;
+
+    if (user && !user.isVerified) {
+        user.name = name;
+        user.phone = phone || user.phone;
+        user.password = password;
+        user.otpCode = otpCode;
+        user.otpExpire = otpExpire;
+        user.status = USER_STATUSES.ACTIVE;
+        user.role = USER_ROLES.CUSTOMER;
+        await user.save();
+    } else {
+        user = await User.create({
+            name,
+            email: email.toLowerCase(),
+            password,
+            phone: phone || '',
+            otpCode,
+            otpExpire,
+            isVerified: false,
+            role: USER_ROLES.CUSTOMER,
+            status: USER_STATUSES.ACTIVE,
+        });
+    }
+
+    const message = `
+        <h1>Welcome to Quad Tech!</h1>
+        <p>Your email verification code is: <strong>${otpCode}</strong></p>
+        <p>This code will expire in 10 minutes.</p>
+    `;
+
     try {
-        const { email, otpCode } = req.body;
-        const user = await User.findOne({ email });
-
-        if (!user) {
-            return res.status(404).json({ message: 'User not found' });
-        }
-
-        if (user.isVerified) {
-            return res.status(400).json({ message: 'User is already verified' });
-        }
-
-        if (user.otpCode !== otpCode || user.otpExpire < Date.now()) {
-            return res.status(400).json({ message: 'Invalid or expired verification code' });
-        }
-
-        user.isVerified = true;
+        await sendEmail({
+            email: user.email,
+            subject: 'Quad Tech - Email Verification Code',
+            message,
+        });
+    } catch (error) {
         user.otpCode = undefined;
         user.otpExpire = undefined;
         await user.save();
-
-        const token = generateToken(res, user._id);
-        res.status(200).json({
-            _id: user._id,
-            name: user.name,
-            email: user.email,
-            isAdmin: user.isAdmin,
-            token
-        });
-    } catch (error) {
-        res.status(500).json({ message: error.message });
+        throw new ApiError(500, 'Email could not be sent');
     }
-};
 
-// @desc    Get user profile
-// @route   GET /api/users/profile
-// @access  Private
-const getUserProfile = async (req, res) => {
-    try {
-        const user = await User.findById(req.user._id);
+    res.status(200).json({ status: 'pending_verification', email: user.email });
+});
 
-        if (user) {
-            res.json({
-                _id: user._id,
-                name: user.name,
-                email: user.email,
-                isAdmin: user.isAdmin,
-            });
-        } else {
-            res.status(404).json({ message: 'User not found' });
-        }
-    } catch (error) {
-        res.status(500).json({ message: error.message });
+const verifyOTP = asyncHandler(async (req, res) => {
+    const { email, otpCode } = req.body;
+    const user = await User.findOne({ email: email?.toLowerCase() });
+
+    if (!user) {
+        throw new ApiError(404, 'User not found');
     }
-};
 
-// @desc    Auth user with Google
-// @route   POST /api/users/google
-// @access  Public
-const googleAuth = async (req, res) => {
+    if (user.isVerified) {
+        throw new ApiError(400, 'User is already verified');
+    }
+
+    if (user.otpCode !== otpCode || user.otpExpire < Date.now()) {
+        throw new ApiError(400, 'Invalid or expired verification code');
+    }
+
+    if (user.status === USER_STATUSES.BLOCKED || user.status === USER_STATUSES.DELETED || user.deletedAt) {
+        throw new ApiError(403, 'Account is not eligible for verification');
+    }
+
+    user.isVerified = true;
+    user.otpCode = undefined;
+    user.otpExpire = undefined;
+    user.lastLogin = new Date();
+    await user.save();
+
+    const token = generateToken(res, user._id);
+    res.status(200).json(buildAuthResponse(user, token));
+});
+
+const getUserProfile = asyncHandler(async (req, res) => {
+    const user = await User.findById(req.user._id)
+        .select('-password -resetPasswordToken -resetPasswordExpire -otpCode')
+        .lean();
+
+    if (!user) {
+        throw new ApiError(404, 'User not found');
+    }
+
+    res.json(sanitizeUser(user));
+});
+
+const googleAuth = asyncHandler(async (req, res) => {
     const { token } = req.body;
+    if (!token) {
+        throw new ApiError(400, 'Google token is required');
+    }
+
+    const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+    let name;
+    let email;
+
     try {
-        const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
-        let name, email;
+        const ticket = await client.verifyIdToken({
+            idToken: token,
+            audience: process.env.GOOGLE_CLIENT_ID,
+        });
 
-        try {
-            // Case 1: Token is an ID Token (JWT) from GSI Widget
-            const ticket = await client.verifyIdToken({
-                idToken: token,
-                audience: process.env.GOOGLE_CLIENT_ID,
-            });
-            const payload = ticket.getPayload();
-            name = payload.name;
-            email = payload.email;
-        } catch (error) {
-            // Case 2: Token is an Access Token from useGoogleLogin custom button
-            client.setCredentials({ access_token: token });
-            const googleResponse = await client.request({
-                url: 'https://www.googleapis.com/oauth2/v3/userinfo'
-            });
-            name = googleResponse.data.name;
-            email = googleResponse.data.email;
+        const payload = ticket.getPayload();
+        name = payload.name;
+        email = payload.email;
+    } catch (idTokenError) {
+        client.setCredentials({ access_token: token });
+        const googleResponse = await client.request({ url: 'https://www.googleapis.com/oauth2/v3/userinfo' });
+        name = googleResponse.data.name;
+        email = googleResponse.data.email;
+    }
 
-            if (!email) {
-                throw new Error("Could not retrieve email from Google");
-            }
-        }
+    if (!email) {
+        throw new ApiError(401, 'Invalid Google token');
+    }
 
-        let user = await User.findOne({ email });
+    let user = await User.findOne({ email: email.toLowerCase() }).select('+password');
 
-        if (!user) {
-            // Create user if not exists (but needs a password set later)
-            user = await User.create({ name, email });
-        }
+    if (!user) {
+        user = await User.create({
+            name,
+            email: email.toLowerCase(),
+            role: USER_ROLES.CUSTOMER,
+            status: USER_STATUSES.ACTIVE,
+            isVerified: true,
+        });
+    }
 
-        const sessionToken = generateToken(res, user._id);
+    ensureUserCanAuthenticate(user);
 
-        res.status(200).json({
-            _id: user._id,
-            name: user.name,
-            email: user.email,
-            isAdmin: user.isAdmin,
+    user.lastLogin = new Date();
+    user.isVerified = true;
+    await user.save();
+
+    const sessionToken = generateToken(res, user._id);
+
+    res.status(200).json(
+        buildAuthResponse(user, sessionToken, {
             needsPassword: !user.password,
-            token: sessionToken,
+        })
+    );
+});
+
+const forgotPassword = asyncHandler(async (req, res) => {
+    const { email, captchaToken } = req.body;
+
+    const isHuman = await verifyRecaptcha(captchaToken);
+    if (!isHuman) {
+        throw new ApiError(400, 'CAPTCHA verification failed. Please try again.');
+    }
+
+    const user = await User.findOne({ email: email?.toLowerCase() }).select('+resetPasswordToken +resetPasswordExpire');
+
+    if (!user) {
+        throw new ApiError(404, 'There is no user with that email');
+    }
+
+    ensureUserCanAuthenticate(user);
+
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    user.resetPasswordToken = crypto.createHash('sha256').update(otpCode).digest('hex');
+    user.resetPasswordExpire = Date.now() + 10 * 60 * 1000;
+    await user.save();
+
+    const message = `
+        <h1>Password Reset Code</h1>
+        <p>Your password reset code is: <strong>${otpCode}</strong></p>
+        <p>Please enter this code into the web application. This code will expire in 10 minutes.</p>
+    `;
+
+    try {
+        await sendEmail({
+            email: user.email,
+            subject: 'Quad Tech - Password Reset',
+            message,
         });
     } catch (error) {
-        console.error("Google Auth Backend Error:", error);
-        res.status(401).json({ message: "Invalid Google Token", error: error.message });
-    }
-};
-
-// @desc    Forgot Password Request
-// @route   POST /api/users/forgotpassword
-// @access  Public
-const forgotPassword = async (req, res) => {
-    try {
-        const { email, captchaToken } = req.body;
-
-        const isHuman = await verifyRecaptcha(captchaToken);
-        if (!isHuman) {
-            return res.status(400).json({ message: 'CAPTCHA verification failed. Please try again.' });
-        }
-        const user = await User.findOne({ email });
-
-        if (!user) {
-            return res.status(404).json({ message: 'There is no user with that email' });
-        }
-
-        const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
-        user.resetPasswordToken = otpCode;
-        user.resetPasswordExpire = Date.now() + 10 * 60 * 1000;
-        await user.save();
-
-        const message = `
-            <h1>Password Reset Code</h1>
-            <p>Your password reset code is: <strong>${otpCode}</strong></p>
-            <p>Please enter this code into the web application. This code will expire in 10 minutes.</p>
-        `;
-
-        try {
-            await sendEmail({
-                email: user.email,
-                subject: 'Quad Tech - Password Reset',
-                message
-            });
-            res.status(200).json({ message: 'Email sent' });
-        } catch (error) {
-            user.resetPasswordToken = undefined;
-            user.resetPasswordExpire = undefined;
-            await user.save();
-            return res.status(500).json({ message: 'Email could not be sent' });
-        }
-    } catch (error) {
-        res.status(500).json({ message: error.message });
-    }
-};
-
-// @desc    Reset Password via OTP
-// @route   POST /api/users/resetpassword
-// @access  Public
-const resetPassword = async (req, res) => {
-    try {
-        const { email, otpCode, password } = req.body;
-        
-        const user = await User.findOne({
-            email,
-            resetPasswordToken: otpCode,
-            resetPasswordExpire: { $gt: Date.now() }
-        });
-
-        if (!user) {
-            return res.status(400).json({ message: 'Invalid or expired token' });
-        }
-
-        user.password = req.body.password;
         user.resetPasswordToken = undefined;
         user.resetPasswordExpire = undefined;
         await user.save();
-
-        res.status(200).json({ message: 'Password reset completely successful' });
-    } catch (error) {
-        res.status(500).json({ message: error.message });
+        throw new ApiError(500, 'Email could not be sent');
     }
-};
 
-// @desc    Set password for Google authenticated users
-// @route   POST /api/users/setpassword
-// @access  Private
-const setGooglePassword = async (req, res) => {
-    try {
-        const user = await User.findById(req.user._id);
-        if (!user) return res.status(404).json({ message: 'User not found' });
-        
-        user.password = req.body.password;
-        await user.save();
+    res.status(200).json({ message: 'Email sent' });
+});
 
-        res.status(200).json({ message: 'Password attached to your account successfully' });
-    } catch (error) {
-        res.status(500).json({ message: error.message });
+const resetPassword = asyncHandler(async (req, res) => {
+    const { email, otpCode, password } = req.body;
+    if (!email || !otpCode || !password) {
+        throw new ApiError(400, 'email, otpCode, and password are required');
     }
-};
+
+    const hashedToken = crypto.createHash('sha256').update(otpCode).digest('hex');
+
+    const user = await User.findOne({
+        email: email.toLowerCase(),
+        resetPasswordToken: hashedToken,
+        resetPasswordExpire: { $gt: Date.now() },
+    }).select('+password +resetPasswordToken +resetPasswordExpire');
+
+    if (!user) {
+        throw new ApiError(400, 'Invalid or expired token');
+    }
+
+    ensureUserCanAuthenticate(user);
+
+    user.password = password;
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpire = undefined;
+    await user.save();
+
+    res.status(200).json({ message: 'Password reset completely successful' });
+});
+
+const setGooglePassword = asyncHandler(async (req, res) => {
+    if (!req.body.password) {
+        throw new ApiError(400, 'password is required');
+    }
+
+    const user = await User.findById(req.user._id).select('+password');
+    if (!user) {
+        throw new ApiError(404, 'User not found');
+    }
+
+    if (user.status === USER_STATUSES.DELETED || user.deletedAt) {
+        throw new ApiError(403, 'Deleted account cannot be updated');
+    }
+
+    user.password = req.body.password;
+    await user.save();
+
+    res.status(200).json({ message: 'Password attached to your account successfully' });
+});
+
+const adminGetUsers = asyncHandler(async (req, res) => {
+    const result = await listUsersForAdmin({ query: req.query });
+    res.json(result);
+});
+
+const adminGetUserById = asyncHandler(async (req, res) => {
+    const result = await getUserAdminDetails({ userId: req.params.id });
+    res.json(result);
+});
+
+const adminUpdateUserStatus = asyncHandler(async (req, res) => {
+    const user = await updateUserStatusByAdmin({
+        actor: req.user,
+        userId: req.params.id,
+        status: req.body.status,
+        note: req.body.note,
+    });
+
+    res.json(user);
+});
+
+const superAdminUpdateUserRole = asyncHandler(async (req, res) => {
+    const user = await updateUserRoleBySuperAdmin({
+        actor: req.user,
+        userId: req.params.id,
+        role: req.body.role,
+        note: req.body.note,
+    });
+
+    res.json(user);
+});
+
+const adminSoftDeleteUser = asyncHandler(async (req, res) => {
+    const user = await softDeleteUserByAdmin({
+        actor: req.user,
+        userId: req.params.id,
+        note: req.body.note,
+    });
+
+    res.json(user);
+});
 
 export {
     authUser,
@@ -332,5 +398,10 @@ export {
     googleAuth,
     forgotPassword,
     resetPassword,
-    setGooglePassword
+    setGooglePassword,
+    adminGetUsers,
+    adminGetUserById,
+    adminUpdateUserStatus,
+    superAdminUpdateUserRole,
+    adminSoftDeleteUser,
 };

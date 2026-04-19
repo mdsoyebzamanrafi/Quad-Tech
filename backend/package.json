@@ -8,7 +8,9 @@
     "start": "node server.js",
     "dev": "nodemon server.js",
     "data:import": "node seeder.js",
-    "data:destroy": "node seeder.js -d"
+    "data:destroy": "node seeder.js -d",
+    "migrate:feature7": "node migrations/20260420_feature7_order_user_admin.js",
+    "bootstrap:superadmin": "node bootstrap/runEnsureSuperAdmin.js"
   },
   "keywords": [],
   "author": "",

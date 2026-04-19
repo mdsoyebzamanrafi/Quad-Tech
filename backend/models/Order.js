@@ -1,4 +1,11 @@
 import mongoose from 'mongoose';
+import {
+    ORDER_STATUSES,
+    ORDER_STATUS_VALUES,
+    PAYMENT_METHOD_VALUES,
+    PAYMENT_STATUSES,
+    PAYMENT_STATUS_VALUES,
+} from '../constants/domainConstants.js';
 
 const orderSchema = new mongoose.Schema(
     {
@@ -6,72 +13,171 @@ const orderSchema = new mongoose.Schema(
             type: mongoose.Schema.Types.ObjectId,
             required: true,
             ref: 'User',
+            index: true,
         },
-        orderItems: [
-            {
-                name: { type: String, required: true },
-                qty: { type: Number, required: true },
-                image: { type: String, required: true },
-                price: { type: Number, required: true },
-                product: {
-                    type: mongoose.Schema.Types.ObjectId,
-                    required: true,
-                    ref: 'Product',
-                },
-            },
-        ],
-        shippingAddress: {
-            address: { type: String, required: true },
-            city: { type: String, required: true },
-            postalCode: { type: String, required: true },
-            country: { type: String, required: true },
+        orderStatus: {
+            type: String,
+            enum: ORDER_STATUS_VALUES,
+            default: ORDER_STATUSES.PENDING,
+            index: true,
+        },
+        paymentStatus: {
+            type: String,
+            enum: PAYMENT_STATUS_VALUES,
+            default: PAYMENT_STATUSES.UNPAID,
+            index: true,
         },
         paymentMethod: {
             type: String,
+            enum: PAYMENT_METHOD_VALUES,
             required: true,
         },
-        paymentResult: {
-            id: { type: String },
-            status: { type: String },
-            update_time: { type: String },
-            email_address: { type: String },
-        },
-        taxPrice: {
+        subtotal: {
             type: Number,
             required: true,
-            default: 0.0,
+            min: 0,
         },
-        shippingPrice: {
+        discount: {
             type: Number,
             required: true,
-            default: 0.0,
+            min: 0,
+            default: 0,
         },
-        totalPrice: {
+        tax: {
             type: Number,
             required: true,
-            default: 0.0,
+            min: 0,
+            default: 0,
         },
-        isPaid: {
+        shippingFee: {
+            type: Number,
+            required: true,
+            min: 0,
+            default: 0,
+        },
+        total: {
+            type: Number,
+            required: true,
+            min: 0,
+        },
+        shippingName: {
+            type: String,
+            required: true,
+            trim: true,
+        },
+        shippingPhone: {
+            type: String,
+            required: true,
+            trim: true,
+        },
+        shippingAddress: {
+            type: String,
+            required: true,
+            trim: true,
+        },
+        shippingAddressLine2: {
+            type: String,
+            trim: true,
+            default: '',
+        },
+        shippingCity: {
+            type: String,
+            required: true,
+            trim: true,
+        },
+        shippingPostalCode: {
+            type: String,
+            required: true,
+            trim: true,
+        },
+        shippingCountry: {
+            type: String,
+            required: true,
+            trim: true,
+        },
+        adminNote: {
+            type: String,
+            default: null,
+        },
+        stockReduced: {
             type: Boolean,
-            required: true,
             default: false,
+            index: true,
+        },
+        stockReducedAt: {
+            type: Date,
+            default: null,
+        },
+        stockRestoredAt: {
+            type: Date,
+            default: null,
         },
         paidAt: {
             type: Date,
+            default: null,
         },
-        isDelivered: {
-            type: Boolean,
-            required: true,
-            default: false,
+        refundedAt: {
+            type: Date,
+            default: null,
         },
         deliveredAt: {
             type: Date,
+            default: null,
+        },
+        cancelledAt: {
+            type: Date,
+            default: null,
+        },
+        failedAt: {
+            type: Date,
+            default: null,
+        },
+        confirmedAt: {
+            type: Date,
+            default: null,
+        },
+        processingAt: {
+            type: Date,
+            default: null,
+        },
+        shippedAt: {
+            type: Date,
+            default: null,
         },
     },
     {
         timestamps: true,
+        toJSON: { virtuals: true },
+        toObject: { virtuals: true },
     }
 );
+
+orderSchema.virtual('itemsPrice').get(function () {
+    return this.subtotal;
+});
+
+orderSchema.virtual('taxPrice').get(function () {
+    return this.tax;
+});
+
+orderSchema.virtual('shippingPrice').get(function () {
+    return this.shippingFee;
+});
+
+orderSchema.virtual('totalPrice').get(function () {
+    return this.total;
+});
+
+orderSchema.virtual('isPaid').get(function () {
+    return this.paymentStatus === PAYMENT_STATUSES.PAID || this.paymentStatus === PAYMENT_STATUSES.REFUNDED;
+});
+
+orderSchema.virtual('isDelivered').get(function () {
+    return this.orderStatus === ORDER_STATUSES.DELIVERED || this.orderStatus === ORDER_STATUSES.REFUND_REQUESTED || this.orderStatus === ORDER_STATUSES.REFUNDED;
+});
+
+orderSchema.index({ createdAt: -1 });
+orderSchema.index({ orderStatus: 1, paymentStatus: 1 });
 
 const Order = mongoose.model('Order', orderSchema);
 
