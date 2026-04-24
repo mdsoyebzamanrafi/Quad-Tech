@@ -14,12 +14,13 @@ const ShippingPage = () => {
     const [city, setCity] = useState(storedAddress.city || '');
     const [postalCode, setPostalCode] = useState(storedAddress.postalCode || '');
     const [country, setCountry] = useState(storedAddress.country || '');
+    const [phone, setPhone] = useState(storedAddress.phone || '');
 
     const navigate = useNavigate();
 
     const submitHandler = (e) => {
         e.preventDefault();
-        saveShippingAddress({ address, city, postalCode, country });
+        saveShippingAddress({ address, city, postalCode, country, phone });
         savePaymentMethod('Placeholder');
         navigate('/placeorder');
     };
@@ -76,6 +77,21 @@ const ShippingPage = () => {
                                 value={postalCode}
                                 required
                                 onChange={(e) => setPostalCode(e.target.value)}
+                                style={{ paddingLeft: '1rem' }}
+                            />
+                        </div>
+                    </div>
+
+                    <div className="form-group">
+                        <label htmlFor="phone">Contact Number</label>
+                        <div className="input-wrapper">
+                            <input
+                                type="tel"
+                                id="phone"
+                                placeholder="Enter contact number"
+                                value={phone}
+                                required
+                                onChange={(e) => setPhone(e.target.value)}
                                 style={{ paddingLeft: '1rem' }}
                             />
                         </div>

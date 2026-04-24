@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { ShoppingCart, User, Search, Sun, Moon, LogOut, Package, Menu, X } from 'lucide-react';
+import { ShoppingCart, User, Search, Sun, Moon, LogOut, Package, Menu, X, ShieldCheck } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
+import { isAdminUser } from '../utils/adminUtils';
 import '../styles/Navbar.css';
 
 const Navbar = () => {
@@ -20,6 +21,7 @@ const Navbar = () => {
     const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
     const dropdownRef = React.useRef(null);
     const searchRef = React.useRef(null);
+    const canAccessAdmin = isAdminUser(userInfo);
 
     React.useEffect(() => {
         const handleClickOutside = (event) => {
@@ -74,8 +76,6 @@ const Navbar = () => {
         setShowSuggestions(false);
         navigate(`/?keyword=${sug}`);
     };
-
-    const defaultKeywords = ['Smartphones', 'Laptops', 'Wearables', 'Gaming', 'Audio'];
 
     return (
         <header className="navbar-container glass">
@@ -165,6 +165,11 @@ const Navbar = () => {
                                     <Link to="/orders" className="dropdown-item">
                                         <Package size={16} /> Orders
                                     </Link>
+                                    {canAccessAdmin && (
+                                        <Link to="/admin" className="dropdown-item">
+                                            <ShieldCheck size={16} /> Admin
+                                        </Link>
+                                    )}
                                     <button onClick={logoutHandler} className="dropdown-item" style={{ color: 'var(--error)' }}>
                                         <LogOut size={16} /> Logout
                                     </button>

@@ -27,6 +27,19 @@ const toNumber = (value, fallback = 0) => {
     return Number.isFinite(parsed) ? Math.round(parsed * 100) / 100 : fallback;
 };
 
+const toStringOrFallback = (value, fallback = '') => {
+    if (typeof value === 'string') {
+        const trimmed = value.trim();
+        return trimmed || fallback;
+    }
+
+    if (value === null || value === undefined) {
+        return fallback;
+    }
+
+    return String(value);
+};
+
 const deriveRole = (rawUser) => {
     if (USER_ROLE_VALUES.includes(rawUser.role)) {
         return rawUser.role;
@@ -159,12 +172,40 @@ const derivePaymentMethod = (rawOrder) => {
     }
 };
 
-const upsertOrderItemsFromLegacy = async (rawOrder) => {
-    const existingItemsCount = await OrderItem.countDocuments({ order: rawOrder._id });
-    if (existingItemsCount > 0) {
-        return;
+const deriveStockReduced = (rawOrder, status) => {
+    if (rawOrder.stockReduced !== undefined) {
+        return Boolean(rawOrder.stockReduced);
     }
 
+    const statusesWithReducedStock = new Set([
+        ORDER_STATUSES.CONFIRMED,
+        ORDER_STATUSES.PROCESSING,
+        ORDER_STATUSES.SHIPPED,
+        ORDER_STATUSES.DELIVERED,
+        ORDER_STATUSES.REFUND_REQUESTED,
+        ORDER_STATUSES.REFUNDED,
+    ]);
+
+    return statusesWithReducedStock.has(status);
+};
+
+const extractLegacyShipping = (rawOrder) => {
+    const shipping = rawOrder.shippingAddress;
+    const shippingObj = shipping && typeof shipping === 'object' ? shipping : {};
+    const shippingText = toStringOrFallback(rawOrder.shippingAddressText || (typeof shipping === 'string' ? shipping : ''), 'unknown');
+
+    return {
+        shippingName: toStringOrFallback(rawOrder.shippingName || rawOrder.userName, 'Customer'),
+        shippingPhone: toStringOrFallback(rawOrder.shippingPhone || shippingObj.phone, 'unknown'),
+        shippingAddress: toStringOrFallback(shippingObj.address || shippingText, 'unknown'),
+        shippingAddressLine2: toStringOrFallback(rawOrder.shippingAddressLine2 || shippingObj.addressLine2, ''),
+        shippingCity: toStringOrFallback(rawOrder.shippingCity || shippingObj.city, 'unknown'),
+        shippingPostalCode: toStringOrFallback(rawOrder.shippingPostalCode || shippingObj.postalCode, 'unknown'),
+        shippingCountry: toStringOrFallback(rawOrder.shippingCountry || shippingObj.country, 'unknown'),
+    };
+};
+
+const upsertOrderItemsFromLegacy = async (rawOrder) => {
     if (!Array.isArray(rawOrder.orderItems) || rawOrder.orderItems.length === 0) {
         return;
     }
@@ -172,36 +213,50 @@ const upsertOrderItemsFromLegacy = async (rawOrder) => {
     const dedupeMap = new Map();
 
     for (const item of rawOrder.orderItems) {
-        if (!item?.product) continue;
+        if (!item?.product || !mongoose.Types.ObjectId.isValid(item.product)) continue;
 
         const key = String(item.product);
         const previous = dedupeMap.get(key) || {
             product: item.product,
-            productName: item.name || 'Unknown Product',
-            productImage: item.image || '',
-            unitPrice: toNumber(item.price, 0),
+            productName: toStringOrFallback(item.name, 'Unknown Product'),
+            productImage: toStringOrFallback(item.image, ''),
+            unitPrice: toNumber(item.price ?? item.unitPrice, 0),
             quantity: 0,
             lineTotal: 0,
         };
 
         const qty = Math.max(1, Number(item.qty) || 1);
         previous.quantity += qty;
-        previous.lineTotal = toNumber(previous.lineTotal + previous.unitPrice * qty, 0);
+        const legacyLineTotal = toNumber(item.lineTotal, 0);
+        previous.lineTotal = legacyLineTotal > 0
+            ? toNumber(previous.lineTotal + legacyLineTotal, 0)
+            : toNumber(previous.lineTotal + previous.unitPrice * qty, 0);
         dedupeMap.set(key, previous);
     }
 
-    const docs = Array.from(dedupeMap.values()).map((item) => ({
-        order: rawOrder._id,
-        product: item.product,
-        productName: item.productName,
-        productImage: item.productImage,
-        unitPrice: item.unitPrice,
-        quantity: item.quantity,
-        lineTotal: item.lineTotal,
+    const operations = Array.from(dedupeMap.values()).map((item) => ({
+        updateOne: {
+            filter: { order: rawOrder._id, product: item.product },
+            update: {
+                $set: {
+                    productName: item.productName,
+                    productImage: item.productImage,
+                    unitPrice: item.unitPrice,
+                    quantity: item.quantity,
+                    lineTotal: item.lineTotal,
+                },
+                $setOnInsert: {
+                    order: rawOrder._id,
+                    product: item.product,
+                    createdAt: rawOrder.createdAt || new Date(),
+                },
+            },
+            upsert: true,
+        },
     }));
 
-    if (docs.length > 0) {
-        await OrderItem.insertMany(docs, { ordered: false });
+    if (operations.length > 0) {
+        await OrderItem.bulkWrite(operations, { ordered: false });
     }
 };
 
@@ -221,36 +276,35 @@ const migrateOrders = async () => {
         const shippingFee = toNumber(rawOrder.shippingFee ?? rawOrder.shippingPrice, 0);
         const total = toNumber(rawOrder.total ?? rawOrder.totalPrice, subtotal - discount + tax + shippingFee);
 
-        const shippingAddressObject = rawOrder.shippingAddress || {};
-
         const status = deriveOrderStatus(rawOrder);
+        const paymentStatus = derivePaymentStatus(rawOrder);
+        const shipping = extractLegacyShipping(rawOrder);
+        const stockReduced = deriveStockReduced(rawOrder, status);
 
         const updatePayload = {
             orderStatus: status,
-            paymentStatus: derivePaymentStatus(rawOrder),
+            paymentStatus,
             paymentMethod: derivePaymentMethod(rawOrder),
             subtotal,
             discount,
             tax,
             shippingFee,
             total,
-            shippingName: rawOrder.shippingName || rawOrder?.userName || 'Customer',
-            shippingPhone: rawOrder.shippingPhone || shippingAddressObject.phone || 'unknown',
-            shippingAddress: rawOrder.shippingAddressText || shippingAddressObject.address || rawOrder.shippingAddress || 'unknown',
-            shippingAddressLine2: rawOrder.shippingAddressLine2 || shippingAddressObject.addressLine2 || '',
-            shippingCity: rawOrder.shippingCity || shippingAddressObject.city || 'unknown',
-            shippingPostalCode: rawOrder.shippingPostalCode || shippingAddressObject.postalCode || 'unknown',
-            shippingCountry: rawOrder.shippingCountry || shippingAddressObject.country || 'unknown',
-            stockReduced:
-                rawOrder.stockReduced !== undefined
-                    ? Boolean(rawOrder.stockReduced)
-                    : Array.isArray(rawOrder.orderItems) && rawOrder.orderItems.length > 0,
+            shippingName: shipping.shippingName,
+            shippingPhone: shipping.shippingPhone,
+            shippingAddress: shipping.shippingAddress,
+            shippingAddressLine2: shipping.shippingAddressLine2,
+            shippingCity: shipping.shippingCity,
+            shippingPostalCode: shipping.shippingPostalCode,
+            shippingCountry: shipping.shippingCountry,
+            stockReduced,
             paidAt: rawOrder.paidAt || null,
+            refundedAt: paymentStatus === PAYMENT_STATUSES.REFUNDED ? rawOrder.refundedAt || rawOrder.updatedAt || new Date() : rawOrder.refundedAt || null,
             deliveredAt: rawOrder.deliveredAt || null,
             adminNote: rawOrder.adminNote || null,
         };
 
-        if (!updatePayload.stockReduced) {
+        if (!stockReduced) {
             updatePayload.stockReducedAt = null;
         } else {
             updatePayload.stockReducedAt = rawOrder.stockReducedAt || rawOrder.createdAt || new Date();

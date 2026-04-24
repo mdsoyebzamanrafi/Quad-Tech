@@ -5,6 +5,7 @@ import {
     PAYMENT_METHOD_VALUES,
     PAYMENT_METHODS,
     USER_ROLE_VALUES,
+    USER_STATUSES,
     USER_STATUS_VALUES,
 } from '../constants/domainConstants.js';
 import {
@@ -149,6 +150,7 @@ const validateUserListFilters = (query) => {
     const { page, limit, skip } = parsePagination(query, { page: 1, limit: 20, maxLimit: 100 });
     const role = cleanString(query.role);
     const status = cleanString(query.status);
+    const includeDeleted = cleanString(query.includeDeleted).toLowerCase() === 'true';
 
     if (role && !USER_ROLE_VALUES.includes(role)) {
         throw new ApiError(400, 'role filter is invalid');
@@ -158,12 +160,16 @@ const validateUserListFilters = (query) => {
         throw new ApiError(400, 'status filter is invalid');
     }
 
+    if (status === USER_STATUSES.DELETED && !includeDeleted) {
+        throw new ApiError(400, 'Use includeDeleted=true when filtering deleted users');
+    }
+
     return {
         pagination: { page, limit, skip },
         role: role || null,
         status: status || null,
         search: cleanString(query.search || query.q),
-        includeDeleted: cleanString(query.includeDeleted).toLowerCase() === 'true',
+        includeDeleted,
         sortBy: cleanString(query.sortBy) || 'createdAt',
         sortOrder: cleanString(query.sortOrder || 'desc').toLowerCase() === 'asc' ? 'asc' : 'desc',
     };

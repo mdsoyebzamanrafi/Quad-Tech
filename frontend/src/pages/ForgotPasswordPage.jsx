@@ -11,14 +11,24 @@ const ForgotPasswordPage = () => {
     const [successMsg, setSuccessMsg] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [captchaToken, setCaptchaToken] = useState('');
+    const isDevCaptchaDisabled = import.meta.env.DEV && import.meta.env.VITE_DISABLE_RECAPTCHA === 'true';
     
     const navigate = useNavigate();
 
     const submitHandler = async (e) => {
         e.preventDefault();
+        if (!isDevCaptchaDisabled && !captchaToken) {
+            setErrorMsg('Please complete the CAPTCHA before requesting a reset code.');
+            return;
+        }
+
         setIsLoading(true);
+        setErrorMsg('');
         try {
-            const { data } = await api.post('/api/users/forgotpassword', { email, captchaToken });
+            await api.post('/api/users/forgotpassword', {
+                email,
+                captchaToken: isDevCaptchaDisabled ? 'dev-recaptcha-disabled' : captchaToken,
+            });
             setSuccessMsg('OTP Code sent! Redirecting...');
             setErrorMsg('');
             setTimeout(() => {
@@ -58,15 +68,26 @@ const ForgotPasswordPage = () => {
                         </div>
                     </div>
 
-                    <div style={{ margin: '1rem 0', display: 'flex', justifyContent: 'center' }}>
-                        <ReCAPTCHA
-                            sitekey={import.meta.env.VITE_RECAPTCHA_SITE_KEY}
-                            onChange={(token) => setCaptchaToken(token)}
-                            theme="dark"
-                        />
-                    </div>
+                    {isDevCaptchaDisabled ? (
+                        <div className="dev-captcha-note">
+                            CAPTCHA is disabled for local development.
+                        </div>
+                    ) : (
+                        <div style={{ margin: '1rem 0', display: 'flex', justifyContent: 'center' }}>
+                            <ReCAPTCHA
+                                sitekey={import.meta.env.VITE_RECAPTCHA_SITE_KEY}
+                                onChange={(token) => setCaptchaToken(token)}
+                                onExpired={() => setCaptchaToken('')}
+                                onErrored={() => {
+                                    setCaptchaToken('');
+                                    setErrorMsg('CAPTCHA could not load. Check the site key or use the local dev bypass.');
+                                }}
+                                theme="dark"
+                            />
+                        </div>
+                    )}
 
-                    <button type="submit" className="btn btn-primary btn-full" disabled={isLoading || !captchaToken}>
+                    <button type="submit" className="btn btn-primary btn-full" disabled={isLoading || (!isDevCaptchaDisabled && !captchaToken)}>
                         {isLoading ? <Loader className="spinner" size={20} /> : 'Send Code'}
                     </button>
                 </form>

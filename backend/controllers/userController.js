@@ -20,14 +20,33 @@ import {
 
 const verifyRecaptcha = async (token) => {
     if (process.env.NODE_ENV === 'test') return true;
-    if (!token) return false;
+
+    const isDevelopmentBypassEnabled = (
+        process.env.NODE_ENV === 'development' &&
+        process.env.DISABLE_RECAPTCHA === 'true'
+    );
+
+    if (isDevelopmentBypassEnabled) {
+        return true;
+    }
+
+    if (!process.env.RECAPTCHA_SECRET_KEY) {
+        throw new ApiError(500, 'reCAPTCHA secret key is not configured');
+    }
+
+    if (!token || typeof token !== 'string') {
+        return false;
+    }
 
     const response = await fetch('https://www.google.com/recaptcha/api/siteverify', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
         },
-        body: `secret=${process.env.RECAPTCHA_SECRET_KEY}&response=${token}`,
+        body: new URLSearchParams({
+            secret: process.env.RECAPTCHA_SECRET_KEY,
+            response: token,
+        }),
     });
 
     const outcome = await response.json();
@@ -63,6 +82,10 @@ const buildAuthResponse = (user, token, extra = {}) => ({
 
 const authUser = asyncHandler(async (req, res) => {
     const { email, password, captchaToken } = req.body;
+
+    if (!email || !password) {
+        throw new ApiError(400, 'email and password are required');
+    }
 
     const isHuman = await verifyRecaptcha(captchaToken);
     if (!isHuman) {
@@ -259,6 +282,10 @@ const googleAuth = asyncHandler(async (req, res) => {
 
 const forgotPassword = asyncHandler(async (req, res) => {
     const { email, captchaToken } = req.body;
+
+    if (!email) {
+        throw new ApiError(400, 'email is required');
+    }
 
     const isHuman = await verifyRecaptcha(captchaToken);
     if (!isHuman) {

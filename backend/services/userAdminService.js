@@ -19,12 +19,6 @@ import {
 } from '../validators/featureValidators.js';
 import { logAudit } from './auditLogService.js';
 
-const roleRank = {
-    [USER_ROLES.CUSTOMER]: 1,
-    [USER_ROLES.ADMIN]: 2,
-    [USER_ROLES.SUPER_ADMIN]: 3,
-};
-
 const sanitizeUser = (user) => ({
     _id: user._id,
     name: user.name,
@@ -189,6 +183,10 @@ const updateUserStatusByAdmin = async ({ actor, userId, status, note }) => {
             throw new ApiError(404, 'User not found');
         }
 
+        if (String(actor._id) === String(user._id) && targetStatus !== USER_STATUSES.ACTIVE) {
+            throw new ApiError(400, 'You cannot set your own account to a non-active status');
+        }
+
         if (user.status === USER_STATUSES.DELETED || user.deletedAt) {
             throw new ApiError(400, 'Deleted users cannot be modified');
         }
@@ -198,7 +196,8 @@ const updateUserStatusByAdmin = async ({ actor, userId, status, note }) => {
             return sanitizeUser(user.toObject());
         }
 
-        if (targetStatus !== USER_STATUSES.ACTIVE) {
+        if (targetStatus !== USER_STATUSES.ACTIVE && user.role === USER_ROLES.SUPER_ADMIN) {
+            await assertNotLastSuperAdmin(user, session);
             await assertNotLastActiveSuperAdmin(user, session);
         }
 
@@ -242,12 +241,12 @@ const updateUserRoleBySuperAdmin = async ({ actor, userId, role, note }) => {
             throw new ApiError(404, 'User not found');
         }
 
-        if (user.status === USER_STATUSES.DELETED || user.deletedAt) {
-            throw new ApiError(400, 'Deleted users cannot be modified');
+        if (String(actor._id) === String(user._id)) {
+            throw new ApiError(400, 'You cannot change your own role');
         }
 
-        if (String(actor._id) === String(user._id) && roleRank[targetRole] > roleRank[actor.role]) {
-            throw new ApiError(403, 'Self-promotion is not allowed');
+        if (user.status === USER_STATUSES.DELETED || user.deletedAt) {
+            throw new ApiError(400, 'Deleted users cannot be modified');
         }
 
         if (user.role === targetRole) {
@@ -296,6 +295,10 @@ const softDeleteUserByAdmin = async ({ actor, userId, note }) => {
         const user = await User.findById(userId).session(session);
         if (!user) {
             throw new ApiError(404, 'User not found');
+        }
+
+        if (String(actor._id) === String(user._id)) {
+            throw new ApiError(400, 'You cannot delete your own account through admin endpoint');
         }
 
         if (user.status === USER_STATUSES.DELETED || user.deletedAt) {

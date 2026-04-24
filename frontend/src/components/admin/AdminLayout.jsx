@@ -1,0 +1,47 @@
+import React from 'react';
+import { NavLink, Outlet } from 'react-router-dom';
+import { ClipboardList, LayoutDashboard, ShieldCheck, Users } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
+import '../../styles/Admin.css';
+
+const AdminLayout = () => {
+    const { userInfo } = useAuth();
+
+    return (
+        <section className="admin-shell">
+            <aside className="admin-sidebar glass">
+                <div className="admin-sidebar-title">
+                    <LayoutDashboard size={22} />
+                    <div>
+                        <span>Admin</span>
+                        <small>{userInfo?.role === 'super_admin' ? 'Super Admin' : 'Admin'}</small>
+                    </div>
+                </div>
+
+                <nav className="admin-nav">
+                    <NavLink to="/admin/orders" className={({ isActive }) => `admin-nav-link ${isActive ? 'active' : ''}`}>
+                        <ClipboardList size={18} />
+                        Orders
+                    </NavLink>
+                    <NavLink to="/admin/users" className={({ isActive }) => `admin-nav-link ${isActive ? 'active' : ''}`}>
+                        <Users size={18} />
+                        Users
+                    </NavLink>
+                </nav>
+
+                {userInfo?.role === 'super_admin' && (
+                    <div className="admin-role-note">
+                        <ShieldCheck size={16} />
+                        Role management enabled
+                    </div>
+                )}
+            </aside>
+
+            <div className="admin-content">
+                <Outlet />
+            </div>
+        </section>
+    );
+};
+
+export default AdminLayout;

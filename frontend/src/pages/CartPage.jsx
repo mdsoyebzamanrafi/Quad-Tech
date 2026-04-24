@@ -38,7 +38,8 @@ const CartPage = () => {
                 address: '123 Default St',
                 city: 'Default City',
                 postalCode: '00000',
-                country: 'Default Country'
+                country: 'Default Country',
+                phone: userInfo?.phone || '0000000000',
             };
 
             const validPayment = paymentMethod || 'Placeholder';
@@ -46,6 +47,7 @@ const CartPage = () => {
             await api.post('/api/orders', {
                 orderItems: cartItems,
                 shippingAddress: validShipping,
+                shippingPhone: validShipping.phone || userInfo?.phone || '0000000000',
                 paymentMethod: validPayment,
                 itemsPrice,
                 shippingPrice,

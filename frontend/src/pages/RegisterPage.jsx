@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Mail, Lock, LogIn, User, Loader } from 'lucide-react';
+import { Mail, Lock, User, Loader } from 'lucide-react';
 import { useGoogleLogin } from '@react-oauth/google';
 import ReCAPTCHA from 'react-google-recaptcha';
 import { useAuth } from '../context/AuthContext';
@@ -14,6 +14,7 @@ const RegisterPage = () => {
     const [errorMsg, setErrorMsg] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [captchaToken, setCaptchaToken] = useState('');
+    const isDevCaptchaDisabled = import.meta.env.DEV && import.meta.env.VITE_DISABLE_RECAPTCHA === 'true';
 
     const { register, googleLogin, userInfo } = useAuth();
     const navigate = useNavigate();
@@ -33,9 +34,15 @@ const RegisterPage = () => {
             setErrorMsg('Passwords do not match');
             return;
         }
+        if (!isDevCaptchaDisabled && !captchaToken) {
+            setErrorMsg('Please complete the CAPTCHA before creating your account.');
+            return;
+        }
+
         setIsLoading(true);
+        setErrorMsg('');
         try {
-            const res = await register(name, email, password, captchaToken);
+            const res = await register(name, email, password, isDevCaptchaDisabled ? 'dev-recaptcha-disabled' : captchaToken);
             if (res && res.status === 'pending_verification') {
                 navigate('/verify', { state: { email } });
                 return;
@@ -147,15 +154,26 @@ const RegisterPage = () => {
                         </div>
                     </div>
 
-                    <div style={{ margin: '1rem 0', display: 'flex', justifyContent: 'center' }}>
-                        <ReCAPTCHA
-                            sitekey={import.meta.env.VITE_RECAPTCHA_SITE_KEY}
-                            onChange={(token) => setCaptchaToken(token)}
-                            theme="dark"
-                        />
-                    </div>
+                    {isDevCaptchaDisabled ? (
+                        <div className="dev-captcha-note">
+                            CAPTCHA is disabled for local development.
+                        </div>
+                    ) : (
+                        <div style={{ margin: '1rem 0', display: 'flex', justifyContent: 'center' }}>
+                            <ReCAPTCHA
+                                sitekey={import.meta.env.VITE_RECAPTCHA_SITE_KEY}
+                                onChange={(token) => setCaptchaToken(token)}
+                                onExpired={() => setCaptchaToken('')}
+                                onErrored={() => {
+                                    setCaptchaToken('');
+                                    setErrorMsg('CAPTCHA could not load. Check the site key or use the local dev bypass.');
+                                }}
+                                theme="dark"
+                            />
+                        </div>
+                    )}
 
-                    <button type="submit" className="btn btn-primary btn-full login-btn" disabled={isLoading || !captchaToken}>
+                    <button type="submit" className="btn btn-primary btn-full login-btn" disabled={isLoading || (!isDevCaptchaDisabled && !captchaToken)}>
                         {isLoading ? <Loader className="spinner" size={20} /> : 'Create Account'}
                     </button>
 

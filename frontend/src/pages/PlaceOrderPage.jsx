@@ -37,6 +37,7 @@ const PlaceOrderPage = () => {
             const { data } = await api.post('/api/orders', {
                 orderItems: cartItems,
                 shippingAddress: shippingAddress,
+                shippingPhone: shippingAddress.phone || userInfo?.phone,
                 paymentMethod: paymentMethod,
                 itemsPrice: itemsPrice,
                 shippingPrice: shippingPrice,
@@ -68,6 +69,7 @@ const PlaceOrderPage = () => {
                         <p style={{ color: 'var(--text-main)', lineHeight: '1.6' }}>
                             <strong>Name: </strong> {userInfo?.name} <br />
                             <strong>Email: </strong> <a href={`mailto:${userInfo?.email}`} style={{ color: 'var(--accent-1)' }}>{userInfo?.email}</a> <br />
+                            <strong>Phone: </strong> {shippingAddress.phone || userInfo?.phone} <br />
                             <strong>Address: </strong>
                             {shippingAddress.address}, {shippingAddress.city} {shippingAddress.postalCode},{' '}
                             {shippingAddress.country}

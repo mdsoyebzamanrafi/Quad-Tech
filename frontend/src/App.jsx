@@ -17,20 +17,26 @@ import OTPVerificationPage from './pages/OTPVerificationPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import SetPasswordPage from './pages/SetPasswordPage';
+import AdminRoute from './components/admin/AdminRoute';
+import AdminLayout from './components/admin/AdminLayout';
+import AdminOrdersPage from './pages/admin/AdminOrdersPage';
+import AdminOrderDetailsPage from './pages/admin/AdminOrderDetailsPage';
+import AdminUsersPage from './pages/admin/AdminUsersPage';
+import AdminUserDetailsPage from './pages/admin/AdminUserDetailsPage';
 import { ThemeProvider } from './context/ThemeContext';
 import { useAuth } from './context/AuthContext';
 
-function AppContent() {
+const RequirePassword = ({ children }) => {
   const { userInfo } = useAuth();
   const location = useLocation();
 
-  const RequirePassword = ({ children }) => {
-    if (userInfo && userInfo.needsPassword && location.pathname !== '/setpassword') {
-      return <Navigate to="/setpassword" replace />;
-    }
-    return children;
-  };
+  if (userInfo && userInfo.needsPassword && location.pathname !== '/setpassword') {
+    return <Navigate to="/setpassword" replace />;
+  }
+  return children;
+};
 
+function AppContent() {
   return (
     <Layout>
       <RequirePassword>
@@ -49,6 +55,20 @@ function AppContent() {
           <Route path="/placeorder" element={<PlaceOrderPage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/orders" element={<OrdersPage />} />
+          <Route
+            path="/admin"
+            element={
+              <AdminRoute>
+                <AdminLayout />
+              </AdminRoute>
+            }
+          >
+            <Route index element={<Navigate to="/admin/orders" replace />} />
+            <Route path="orders" element={<AdminOrdersPage />} />
+            <Route path="orders/:id" element={<AdminOrderDetailsPage />} />
+            <Route path="users" element={<AdminUsersPage />} />
+            <Route path="users/:id" element={<AdminUserDetailsPage />} />
+          </Route>
         </Routes>
       </RequirePassword>
     </Layout>

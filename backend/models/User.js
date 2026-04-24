@@ -94,17 +94,15 @@ userSchema.methods.canAccessAdmin = function () {
     return ADMIN_ROLE_SET.has(this.role) && this.status === USER_STATUSES.ACTIVE && !this.deletedAt;
 };
 
-userSchema.pre('save', async function (next) {
+userSchema.pre('save', async function () {
     if (!this.isModified('password') || !this.password) {
-        return next();
+        return;
     }
 
     const salt = await bcrypt.genSalt(10);
     this.password = await bcrypt.hash(this.password, salt);
-    return next();
 });
 
-userSchema.index({ email: 1 }, { unique: true });
 userSchema.index({ role: 1, status: 1 });
 
 const User = mongoose.model('User', userSchema);
