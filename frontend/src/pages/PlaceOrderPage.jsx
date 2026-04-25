@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
@@ -8,18 +8,89 @@ import '../styles/CartPage.css'; // Let's reuse some summary styles
 
 const PlaceOrderPage = () => {
     const navigate = useNavigate();
-    const { cartItems, shippingAddress, paymentMethod, clearCart } = useCart();
+    const {
+        cartItems,
+        shippingAddress,
+        paymentMethod,
+        clearCart,
+        couponCode: savedCouponCode,
+        couponDiscount: savedCouponDiscount,
+        useRewardTokens,
+        requestedTokens: savedRequestedTokens,
+        saveCouponPreview,
+        removeCoupon,
+        saveTokenUsage,
+        clearDiscounts,
+    } = useCart();
     const { userInfo } = useAuth();
+    const [profile, setProfile] = useState(userInfo);
+    const [couponInput, setCouponInput] = useState(savedCouponCode || '');
+    const [couponLoading, setCouponLoading] = useState(false);
+    const [couponMessage, setCouponMessage] = useState('');
+    const [tokenMessage, setTokenMessage] = useState('');
+    const [requestedTokenInput, setRequestedTokenInput] = useState(savedRequestedTokens ? String(savedRequestedTokens) : '');
 
-    // Calculate Prices
     const addDecimals = (num) => {
         return (Math.round(num * 100) / 100).toFixed(2);
     };
 
-    const itemsPrice = addDecimals(cartItems.reduce((acc, item) => acc + item.price * item.qty, 0));
-    const shippingPrice = addDecimals(itemsPrice > 100 ? 0 : 10);
-    const taxPrice = addDecimals(Number((0.15 * itemsPrice).toFixed(2))); // 15% tax
-    const totalPrice = (Number(itemsPrice) + Number(shippingPrice) + Number(taxPrice)).toFixed(2);
+    const itemsPriceNumber = useMemo(
+        () => Math.round(cartItems.reduce((acc, item) => acc + item.price * item.qty, 0) * 100) / 100,
+        [cartItems]
+    );
+    const availableTokens = Number(profile?.rewardTokens || 0);
+    const tokenPreview = useMemo(() => {
+        if (!useRewardTokens) {
+            return { tokensUsed: 0, discountAmount: 0 };
+        }
+
+        const parsedRequestedTokens = Number(requestedTokenInput);
+        if (!Number.isFinite(parsedRequestedTokens) || parsedRequestedTokens <= 0) {
+            return { tokensUsed: 0, discountAmount: 0 };
+        }
+
+        const remainingAfterCoupon = Math.max(itemsPriceNumber - Number(savedCouponDiscount || 0), 0);
+        const maxDiscount = Math.round((remainingAfterCoupon * 0.2) * 100) / 100;
+        const maxTokensAllowed = Math.floor(maxDiscount * 10);
+        const tokensUsed = Math.max(0, Math.min(Math.floor(parsedRequestedTokens), availableTokens, maxTokensAllowed));
+
+        return {
+            tokensUsed,
+            discountAmount: Math.round((tokensUsed / 10) * 100) / 100,
+        };
+    }, [availableTokens, itemsPriceNumber, requestedTokenInput, savedCouponDiscount, useRewardTokens]);
+    const netItemsPriceNumber = Math.max(itemsPriceNumber - Number(savedCouponDiscount || 0) - tokenPreview.discountAmount, 0);
+    const shippingPriceNumber = netItemsPriceNumber > 1000 ? 0 : 100;
+    const taxPriceNumber = Math.round(netItemsPriceNumber * 0.1 * 100) / 100;
+    const totalDiscountNumber = Math.round((Number(savedCouponDiscount || 0) + tokenPreview.discountAmount) * 100) / 100;
+    const totalPriceNumber = Math.round((netItemsPriceNumber + shippingPriceNumber + taxPriceNumber) * 100) / 100;
+    const itemsPrice = addDecimals(itemsPriceNumber);
+    const shippingPrice = addDecimals(shippingPriceNumber);
+    const taxPrice = addDecimals(taxPriceNumber);
+    const totalPrice = addDecimals(totalPriceNumber);
+
+    useEffect(() => {
+        const fetchProfile = async () => {
+            try {
+                const { data } = await api.get('/api/users/profile');
+                setProfile((current) => ({ ...current, ...data }));
+            } catch (error) {
+                console.error('Failed to load profile for checkout', error);
+            }
+        };
+
+        if (userInfo) {
+            fetchProfile();
+        }
+    }, [userInfo]);
+
+    useEffect(() => {
+        saveTokenUsage({
+            useRewardTokens,
+            requestedTokens: tokenPreview.tokensUsed,
+            tokenDiscount: tokenPreview.discountAmount,
+        });
+    }, [tokenPreview.discountAmount, tokenPreview.tokensUsed, useRewardTokens]);
 
     useEffect(() => {
         if (!shippingAddress.address) {
@@ -28,6 +99,79 @@ const PlaceOrderPage = () => {
             navigate('/payment');
         }
     }, [shippingAddress, paymentMethod, navigate]);
+
+    const applyCouponHandler = async () => {
+        if (!couponInput.trim()) {
+            window.alert('Enter a coupon code first.');
+            return;
+        }
+
+        setCouponLoading(true);
+        setCouponMessage('');
+
+        try {
+            const { data } = await api.post('/api/coupons/validate', {
+                code: couponInput.trim(),
+                itemsPrice: itemsPriceNumber,
+            });
+
+            saveCouponPreview({
+                couponCode: data.code,
+                couponDiscount: data.discountAmount,
+            });
+            setCouponInput(data.code);
+            setCouponMessage(`Coupon applied. Discount: $${addDecimals(data.discountAmount)}`);
+        } catch (error) {
+            const message = error.response?.data?.message || 'Failed to validate coupon';
+            removeCoupon();
+            setCouponMessage(message);
+            window.alert(message);
+        } finally {
+            setCouponLoading(false);
+        }
+    };
+
+    const removeCouponHandler = () => {
+        removeCoupon();
+        setCouponInput('');
+        setCouponMessage('Coupon removed.');
+    };
+
+    const toggleRewardTokens = (event) => {
+        const checked = event.target.checked;
+        if (!checked) {
+            setRequestedTokenInput('');
+            setTokenMessage('');
+        }
+        saveTokenUsage({
+            useRewardTokens: checked,
+            requestedTokens: checked ? tokenPreview.tokensUsed : 0,
+            tokenDiscount: checked ? tokenPreview.discountAmount : 0,
+        });
+    };
+
+    const handleTokenInputChange = (event) => {
+        const nextValue = event.target.value.replace(/[^\d]/g, '');
+        setRequestedTokenInput(nextValue);
+
+        if (!nextValue) {
+            setTokenMessage('');
+            return;
+        }
+
+        const parsed = Number(nextValue);
+        if (parsed > availableTokens) {
+            setTokenMessage(`Only ${availableTokens} tokens are available.`);
+            return;
+        }
+
+        if (parsed > 0 && tokenPreview.tokensUsed < parsed) {
+            setTokenMessage(`Only ${tokenPreview.tokensUsed} tokens can be used here because of the 20% cap.`);
+            return;
+        }
+
+        setTokenMessage('');
+    };
 
     const placeOrderHandler = async () => {
         if (!window.confirm(`Are you sure you want to pay an amount of $${totalPrice}?`)) {
@@ -39,15 +183,13 @@ const PlaceOrderPage = () => {
                 shippingAddress: shippingAddress,
                 shippingPhone: shippingAddress.phone || userInfo?.phone,
                 paymentMethod: paymentMethod,
-                itemsPrice: itemsPrice,
-                shippingPrice: shippingPrice,
-                taxPrice: taxPrice,
-                totalPrice: totalPrice,
+                couponCode: savedCouponCode || undefined,
+                requestedTokens: useRewardTokens ? tokenPreview.tokensUsed : 0,
             });
+            clearDiscounts();
             clearCart();
-            // In a real app, we'd redirect to /order/123 to complete payment
             alert('Order placed successfully! Backend response ID: ' + data._id);
-            navigate('/');
+            navigate(`/order/${data._id}`);
         } catch (error) {
             alert(error.response?.data?.message || 'Error placing order');
         }
@@ -87,6 +229,71 @@ const PlaceOrderPage = () => {
                         </p>
                     </div>
 
+                    <div className="glass" style={{ padding: '2rem', borderRadius: 'var(--radius-lg)' }}>
+                        <h2 style={{ fontSize: '1.25rem', marginBottom: '1rem', color: 'var(--text-main)' }}>Discounts</h2>
+
+                        <div style={{ display: 'grid', gap: '0.75rem' }}>
+                            <div>
+                                <label style={{ display: 'block', marginBottom: '0.35rem', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                                    Coupon Code
+                                </label>
+                                <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                                    <input
+                                        type="text"
+                                        value={couponInput}
+                                        onChange={(event) => setCouponInput(event.target.value.toUpperCase())}
+                                        placeholder="WELCOME10"
+                                        style={{
+                                            flex: '1 1 220px',
+                                            minHeight: '46px',
+                                            borderRadius: '10px',
+                                            border: '1px solid var(--border-color)',
+                                            background: 'var(--bg-secondary)',
+                                            color: 'var(--text-main)',
+                                            padding: '0.8rem 0.9rem',
+                                        }}
+                                    />
+                                    <button className="btn btn-primary" type="button" onClick={applyCouponHandler} disabled={couponLoading}>
+                                        {couponLoading ? 'Applying...' : 'Apply Coupon'}
+                                    </button>
+                                    <button className="btn btn-secondary" type="button" onClick={removeCouponHandler} disabled={!savedCouponCode}>
+                                        Remove Coupon
+                                    </button>
+                                </div>
+                                {couponMessage && (
+                                    <p style={{ marginTop: '0.5rem', color: savedCouponCode ? 'var(--success)' : 'var(--text-muted)' }}>{couponMessage}</p>
+                                )}
+                            </div>
+
+                            <div>
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', color: 'var(--text-main)', marginBottom: '0.5rem' }}>
+                                    <input type="checkbox" checked={useRewardTokens} onChange={toggleRewardTokens} />
+                                    Use reward tokens
+                                </label>
+                                <p style={{ color: 'var(--text-muted)', marginBottom: '0.75rem' }}>
+                                    Available tokens: {availableTokens}
+                                </p>
+                                <input
+                                    type="text"
+                                    value={requestedTokenInput}
+                                    onChange={handleTokenInputChange}
+                                    disabled={!useRewardTokens}
+                                    placeholder="Enter token amount"
+                                    style={{
+                                        width: '100%',
+                                        minHeight: '46px',
+                                        borderRadius: '10px',
+                                        border: '1px solid var(--border-color)',
+                                        background: 'var(--bg-secondary)',
+                                        color: 'var(--text-main)',
+                                        padding: '0.8rem 0.9rem',
+                                    }}
+                                />
+                                {tokenMessage && <p style={{ marginTop: '0.5rem', color: 'var(--text-muted)' }}>{tokenMessage}</p>}
+                            </div>
+                        </div>
+                    </div>
+
                     {/* Order Items Block */}
                     <div className="glass" style={{ padding: '2rem', borderRadius: 'var(--radius-lg)' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem', color: 'var(--text-main)' }}>
@@ -123,6 +330,26 @@ const PlaceOrderPage = () => {
                         </div>
 
                         <div className="summary-row">
+                            <span>Coupon Discount</span>
+                            <span>- ${addDecimals(savedCouponDiscount || 0)}</span>
+                        </div>
+
+                        <div className="summary-row">
+                            <span>Token Discount</span>
+                            <span>- ${addDecimals(tokenPreview.discountAmount)}</span>
+                        </div>
+
+                        <div className="summary-row">
+                            <span>Total Discount</span>
+                            <span>- ${addDecimals(totalDiscountNumber)}</span>
+                        </div>
+
+                        <div className="summary-row">
+                            <span>Net Items</span>
+                            <span>${addDecimals(netItemsPriceNumber)}</span>
+                        </div>
+
+                        <div className="summary-row">
                             <span>Shipping</span>
                             <span>${shippingPrice}</span>
                         </div>
@@ -135,7 +362,7 @@ const PlaceOrderPage = () => {
                         <div className="summary-divider"></div>
 
                         <div className="summary-row total-row">
-                            <span>Order Total</span>
+                            <span>Final Total</span>
                             <span className="text-gradient">${totalPrice}</span>
                         </div>
 

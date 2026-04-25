@@ -32,12 +32,63 @@ const orderSchema = new mongoose.Schema(
             enum: PAYMENT_METHOD_VALUES,
             required: true,
         },
+        coupon: {
+            code: {
+                type: String,
+                default: '',
+                trim: true,
+            },
+            couponId: {
+                type: mongoose.Schema.Types.ObjectId,
+                ref: 'Coupon',
+                default: null,
+            },
+            discountAmount: {
+                type: Number,
+                min: 0,
+                default: 0,
+            },
+        },
+        tokenDiscount: {
+            tokensUsed: {
+                type: Number,
+                min: 0,
+                default: 0,
+            },
+            discountAmount: {
+                type: Number,
+                min: 0,
+                default: 0,
+            },
+            tokensDeducted: {
+                type: Boolean,
+                default: false,
+            },
+        },
         subtotal: {
             type: Number,
             required: true,
             min: 0,
         },
+        grossItemsPrice: {
+            type: Number,
+            required: true,
+            min: 0,
+            default: 0,
+        },
+        netItemsPrice: {
+            type: Number,
+            required: true,
+            min: 0,
+            default: 0,
+        },
         discount: {
+            type: Number,
+            required: true,
+            min: 0,
+            default: 0,
+        },
+        totalDiscount: {
             type: Number,
             required: true,
             min: 0,
@@ -59,6 +110,11 @@ const orderSchema = new mongoose.Schema(
             type: Number,
             required: true,
             min: 0,
+        },
+        rewardTokensEarned: {
+            type: Number,
+            min: 0,
+            default: 0,
         },
         shippingName: {
             type: String,
@@ -153,7 +209,7 @@ const orderSchema = new mongoose.Schema(
 );
 
 orderSchema.virtual('itemsPrice').get(function () {
-    return this.subtotal;
+    return this.grossItemsPrice || this.subtotal;
 });
 
 orderSchema.virtual('taxPrice').get(function () {
@@ -170,6 +226,14 @@ orderSchema.virtual('totalPrice').get(function () {
 
 orderSchema.virtual('isPaid').get(function () {
     return this.paymentStatus === PAYMENT_STATUSES.PAID || this.paymentStatus === PAYMENT_STATUSES.REFUNDED;
+});
+
+orderSchema.virtual('couponDiscount').get(function () {
+    return this.coupon?.discountAmount || 0;
+});
+
+orderSchema.virtual('tokenDiscountAmount').get(function () {
+    return this.tokenDiscount?.discountAmount || 0;
 });
 
 orderSchema.virtual('isDelivered').get(function () {

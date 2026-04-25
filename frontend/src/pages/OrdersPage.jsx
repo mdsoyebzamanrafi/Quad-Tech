@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Package } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import api from '../utils/api';
@@ -168,6 +168,7 @@ const OrdersPage = () => {
                                     <th style={{ padding: '1rem 0' }}>DATE</th>
                                     <th style={{ padding: '1rem 0' }}>PRICE</th>
                                     <th style={{ padding: '1rem 0' }}>STATUS</th>
+                                    <th style={{ padding: '1rem 0' }}>DISCOUNT</th>
                                     <th style={{ padding: '1rem 0' }}>ACTION</th>
                                 </tr>
                             </thead>
@@ -190,6 +191,12 @@ const OrdersPage = () => {
                                                 <td style={{ padding: '1rem 0' }}>${(item.price * item.qty).toFixed(2)}</td>
                                                 <td style={{ padding: '1rem 0' }}>
                                                     <span style={{ color: getOrderStatusColor(status), fontWeight: 600 }}>{statusLabel}</span>
+                                                </td>
+                                                <td style={{ padding: '1rem 0' }}>
+                                                    <div>${Number(order.totalDiscount || order.discount || 0).toFixed(2)}</div>
+                                                    <Link to={`/order/${order._id}`} style={{ color: 'var(--accent-1)', fontSize: '0.85rem' }}>
+                                                        View details
+                                                    </Link>
                                                 </td>
                                                 <td style={{ padding: '1rem 0' }}>
                                                     {action.type === 'none' ? (

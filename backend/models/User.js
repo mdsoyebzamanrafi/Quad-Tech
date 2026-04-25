@@ -65,6 +65,21 @@ const userSchema = new mongoose.Schema(
             type: Date,
             default: null,
         },
+        rewardTokens: {
+            type: Number,
+            default: 0,
+            min: 0,
+        },
+        lifetimeSpent: {
+            type: Number,
+            default: 0,
+            min: 0,
+        },
+        totalOrders: {
+            type: Number,
+            default: 0,
+            min: 0,
+        },
         deletedAt: {
             type: Date,
             default: null,

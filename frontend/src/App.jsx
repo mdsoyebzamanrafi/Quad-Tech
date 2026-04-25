@@ -11,6 +11,7 @@ import RegisterPage from './pages/RegisterPage';
 import ShippingPage from './pages/ShippingPage';
 import PaymentPage from './pages/PaymentPage';
 import PlaceOrderPage from './pages/PlaceOrderPage';
+import OrderPage from './pages/OrderPage';
 import ProfilePage from './pages/ProfilePage';
 import OrdersPage from './pages/OrdersPage';
 import OTPVerificationPage from './pages/OTPVerificationPage';
@@ -23,6 +24,10 @@ import AdminOrdersPage from './pages/admin/AdminOrdersPage';
 import AdminOrderDetailsPage from './pages/admin/AdminOrderDetailsPage';
 import AdminUsersPage from './pages/admin/AdminUsersPage';
 import AdminUserDetailsPage from './pages/admin/AdminUserDetailsPage';
+import CouponListPage from './pages/admin/CouponListPage';
+import CouponCreatePage from './pages/admin/CouponCreatePage';
+import CouponEditPage from './pages/admin/CouponEditPage';
+import SalesDashboardPage from './pages/admin/SalesDashboardPage';
 import { ThemeProvider } from './context/ThemeContext';
 import { useAuth } from './context/AuthContext';
 
@@ -53,6 +58,7 @@ function AppContent() {
           <Route path="/shipping" element={<ShippingPage />} />
           <Route path="/payment" element={<PaymentPage />} />
           <Route path="/placeorder" element={<PlaceOrderPage />} />
+          <Route path="/order/:id" element={<OrderPage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/orders" element={<OrdersPage />} />
           <Route
@@ -66,6 +72,10 @@ function AppContent() {
             <Route index element={<Navigate to="/admin/orders" replace />} />
             <Route path="orders" element={<AdminOrdersPage />} />
             <Route path="orders/:id" element={<AdminOrderDetailsPage />} />
+            <Route path="coupons" element={<CouponListPage />} />
+            <Route path="coupon/create" element={<CouponCreatePage />} />
+            <Route path="coupon/:id/edit" element={<CouponEditPage />} />
+            <Route path="sales" element={<SalesDashboardPage />} />
             <Route path="users" element={<AdminUsersPage />} />
             <Route path="users/:id" element={<AdminUserDetailsPage />} />
           </Route>

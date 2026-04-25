@@ -227,9 +227,16 @@ const AdminOrderDetailsPage = () => {
                 <div className="admin-card">
                     <h3>Totals</h3>
                     <div className="admin-detail-list">
-                        <div className="admin-detail-row"><span>Subtotal</span><strong>{formatMoney(order.subtotal ?? order.itemsPrice)}</strong></div>
+                        <div className="admin-detail-row"><span>Gross Items</span><strong>{formatMoney(order.grossItemsPrice ?? order.subtotal ?? order.itemsPrice)}</strong></div>
+                        <div className="admin-detail-row"><span>Coupon Code</span><strong>{order.coupon?.code || 'None'}</strong></div>
+                        <div className="admin-detail-row"><span>Coupon Discount</span><strong>{formatMoney(order.coupon?.discountAmount)}</strong></div>
+                        <div className="admin-detail-row"><span>Tokens Used</span><strong>{order.tokenDiscount?.tokensUsed || 0}</strong></div>
+                        <div className="admin-detail-row"><span>Token Discount</span><strong>{formatMoney(order.tokenDiscount?.discountAmount)}</strong></div>
+                        <div className="admin-detail-row"><span>Total Discount</span><strong>{formatMoney(order.totalDiscount ?? order.discount)}</strong></div>
+                        <div className="admin-detail-row"><span>Net Items</span><strong>{formatMoney(order.netItemsPrice)}</strong></div>
                         <div className="admin-detail-row"><span>Tax</span><strong>{formatMoney(order.tax ?? order.taxPrice)}</strong></div>
                         <div className="admin-detail-row"><span>Shipping</span><strong>{formatMoney(order.shippingFee ?? order.shippingPrice)}</strong></div>
+                        <div className="admin-detail-row"><span>Tokens Earned</span><strong>{order.rewardTokensEarned || 0}</strong></div>
                         <div className="admin-detail-row"><span>Total</span><strong>{formatMoney(order.total ?? order.totalPrice)}</strong></div>
                     </div>
                 </div>

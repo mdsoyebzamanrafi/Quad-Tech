@@ -13,6 +13,7 @@ import {
     parseDateOrThrow,
     parseOptionalNumberOrThrow,
     parsePagination,
+    requireNonNegativeNumber,
     requireNonEmptyString,
     requireObjectId,
     requirePositiveInteger,
@@ -77,6 +78,16 @@ const validateCreateOrderInput = (payload) => {
     const addressLine2 = cleanString(shippingAddress.addressLine2);
 
     const paymentMethod = normalizePaymentMethod(payload.paymentMethod);
+    const couponCode = cleanString(payload.couponCode).toUpperCase();
+    let requestedTokens = 0;
+
+    if (payload.requestedTokens !== undefined && payload.requestedTokens !== null && payload.requestedTokens !== '') {
+        const parsedTokens = requireNonNegativeNumber(payload.requestedTokens, 'requestedTokens');
+        if (!Number.isInteger(parsedTokens)) {
+            throw new ApiError(400, 'requestedTokens must be a whole number');
+        }
+        requestedTokens = parsedTokens;
+    }
 
     return {
         orderItems,
@@ -90,6 +101,8 @@ const validateCreateOrderInput = (payload) => {
             country,
         },
         paymentMethod,
+        couponCode,
+        requestedTokens,
     };
 };
 

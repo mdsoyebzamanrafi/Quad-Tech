@@ -1,68 +1,106 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ShoppingBag, X, ArrowRight, CreditCard } from 'lucide-react';
+import { ShoppingBag, X, ArrowRight, Tag } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import api from '../utils/api';
 import '../styles/CartPage.css';
 
 const CartPage = () => {
-    const { cartItems, addToCart, removeFromCart, clearCart, shippingAddress, paymentMethod } = useCart();
+    const {
+        cartItems,
+        addToCart,
+        removeFromCart,
+        couponCode,
+        couponDiscount,
+        applyCouponPreview,
+        removeCoupon,
+    } = useCart();
     const { userInfo } = useAuth();
     const navigate = useNavigate();
 
-    const [showPaymentModal, setShowPaymentModal] = useState(false);
-    const [isProcessing, setIsProcessing] = useState(false);
+    const [couponInput, setCouponInput] = useState(couponCode || '');
+    const [couponError, setCouponError] = useState('');
+    const [couponNotice, setCouponNotice] = useState('');
+    const [couponLoading, setCouponLoading] = useState(false);
+    const previousCouponRef = useRef(couponCode);
+    const manualRemoveRef = useRef(false);
 
-    // Calculate Prices exactly like PlaceOrderPage
-    const addDecimals = (num) => (Math.round(num * 100) / 100).toFixed(2);
-    const itemsPrice = addDecimals(cartItems.reduce((acc, item) => acc + item.price * item.qty, 0));
-    const shippingPrice = addDecimals(itemsPrice > 100 ? 0 : 10);
-    const taxPrice = addDecimals(Number((0.15 * itemsPrice).toFixed(2)));
-    const totalPrice = (Number(itemsPrice) + Number(shippingPrice) + Number(taxPrice)).toFixed(2);
+    const addDecimals = (num) => (Math.round(Number(num || 0) * 100) / 100).toFixed(2);
+    const itemsCount = cartItems.reduce((acc, item) => acc + item.qty, 0);
+    const itemsPriceNumber = useMemo(
+        () => Math.round(cartItems.reduce((acc, item) => acc + item.price * item.qty, 0) * 100) / 100,
+        [cartItems]
+    );
+    const safeCouponDiscount = Math.min(Math.max(Number(couponDiscount || 0), 0), itemsPriceNumber);
+    const displayedTotal = Math.max(itemsPriceNumber - safeCouponDiscount, 0);
+
+    useEffect(() => {
+        if (couponCode) {
+            previousCouponRef.current = couponCode;
+            setCouponInput(couponCode);
+            return;
+        }
+
+        if (previousCouponRef.current && !manualRemoveRef.current) {
+            setCouponNotice('Cart changed. Please apply coupon again.');
+        }
+
+        previousCouponRef.current = '';
+        manualRemoveRef.current = false;
+    }, [couponCode]);
 
     const checkoutHandler = () => {
         if (!userInfo) {
             navigate('/login?redirect=cart');
             return;
         }
-        // Instead of typical flow, just show the custom modal
-        setShowPaymentModal(true);
+        navigate('/shipping');
     };
 
-    const confirmPaymentHandler = async () => {
-        setIsProcessing(true);
-        try {
-            // Need a valid dummy address if they haven't set one yet to bypass mongoose validation
-            const validShipping = shippingAddress?.address ? shippingAddress : {
-                address: '123 Default St',
-                city: 'Default City',
-                postalCode: '00000',
-                country: 'Default Country',
-                phone: userInfo?.phone || '0000000000',
-            };
+    const applyCouponHandler = async () => {
+        const nextCode = couponInput.trim().toUpperCase();
 
-            const validPayment = paymentMethod || 'Placeholder';
-
-            await api.post('/api/orders', {
-                orderItems: cartItems,
-                shippingAddress: validShipping,
-                shippingPhone: validShipping.phone || userInfo?.phone || '0000000000',
-                paymentMethod: validPayment,
-                itemsPrice,
-                shippingPrice,
-                taxPrice,
-                totalPrice,
-            });
-            clearCart();
-            setShowPaymentModal(false);
-            navigate('/orders');
-        } catch (error) {
-            alert(error.response?.data?.message || 'Error placing order');
-            setShowPaymentModal(false);
-        } finally {
-            setIsProcessing(false);
+        if (!userInfo) {
+            setCouponError('Please sign in before applying a coupon.');
+            return;
         }
+
+        if (!nextCode) {
+            setCouponError('Enter a coupon code.');
+            return;
+        }
+
+        setCouponLoading(true);
+        setCouponError('');
+        setCouponNotice('');
+
+        try {
+            const { data } = await api.post('/api/coupons/validate', {
+                code: nextCode,
+                itemsPrice: itemsPriceNumber,
+            });
+
+            applyCouponPreview({
+                couponCode: data.code,
+                couponDiscount: data.discountAmount,
+            });
+            setCouponInput(data.code);
+            setCouponNotice(data.message || 'Coupon applied successfully.');
+        } catch (error) {
+            removeCoupon();
+            setCouponError(error.response?.data?.message || 'Invalid coupon.');
+        } finally {
+            setCouponLoading(false);
+        }
+    };
+
+    const removeCouponHandler = () => {
+        manualRemoveRef.current = true;
+        removeCoupon();
+        setCouponInput('');
+        setCouponError('');
+        setCouponNotice('Coupon removed.');
     };
 
     const removeFromCartHandler = (id) => {
@@ -132,10 +170,8 @@ const CartPage = () => {
                                 <h2 className="summary-title">Summary</h2>
 
                                 <div className="summary-row">
-                                    <span>Items ({cartItems.reduce((acc, item) => acc + item.qty, 0)})</span>
-                                    <span>
-                                        ${cartItems.reduce((acc, item) => acc + item.qty * item.price, 0).toFixed(2)}
-                                    </span>
+                                    <span>Items ({itemsCount})</span>
+                                    <span>${addDecimals(itemsPriceNumber)}</span>
                                 </div>
 
                                 <div className="summary-row">
@@ -143,12 +179,60 @@ const CartPage = () => {
                                     <span className="text-success">Free</span>
                                 </div>
 
+                                <div className="coupon-section">
+                                    <div className="coupon-section-title">
+                                        <Tag size={18} />
+                                        <span>Coupon</span>
+                                    </div>
+
+                                    <div className="coupon-form">
+                                        <input
+                                            type="text"
+                                            value={couponInput}
+                                            onChange={(event) => {
+                                                setCouponInput(event.target.value.toUpperCase());
+                                                setCouponError('');
+                                                setCouponNotice('');
+                                            }}
+                                            placeholder="Enter coupon code"
+                                            className="coupon-input"
+                                            disabled={couponLoading}
+                                        />
+                                        <button
+                                            type="button"
+                                            className="btn btn-primary coupon-apply-btn"
+                                            onClick={applyCouponHandler}
+                                            disabled={couponLoading || !couponInput.trim()}
+                                        >
+                                            {couponLoading ? 'Applying...' : 'Apply Coupon'}
+                                        </button>
+                                    </div>
+
+                                    {couponError && <p className="coupon-message error">{couponError}</p>}
+                                    {couponNotice && !couponError && <p className="coupon-message success">{couponNotice}</p>}
+
+                                    {couponCode && (
+                                        <div className="applied-coupon-box">
+                                            <div className="applied-coupon-top">
+                                                <span>Applied: <strong>{couponCode}</strong></span>
+                                                <button type="button" className="coupon-remove-btn" onClick={removeCouponHandler}>
+                                                    Remove
+                                                </button>
+                                            </div>
+                                            <div className="summary-row coupon-discount-row">
+                                                <span>Coupon Discount</span>
+                                                <span>- ${addDecimals(safeCouponDiscount)}</span>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
                                 <div className="summary-divider"></div>
 
                                 <div className="summary-row total-row">
                                     <span>Total</span>
                                     <span className="text-gradient">
-                                        ${cartItems.reduce((acc, item) => acc + item.qty * item.price, 0).toFixed(2)}
+                                        ${addDecimals(displayedTotal)}
                                     </span>
                                 </div>
 
@@ -162,46 +246,6 @@ const CartPage = () => {
                             </div>
                         </div>
                     </div>
-
-                    {/* Custom Payment Modal Overlay */}
-                    {showPaymentModal && (
-                        <div className="payment-modal-overlay animate-fade-in" style={{
-                            position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
-                            backgroundColor: 'rgba(0, 0, 0, 0.6)', backdropFilter: 'blur(4px)',
-                            display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 9999
-                        }}>
-                            <div className="glass" style={{
-                                padding: '2.5rem', borderRadius: 'var(--radius-lg)', maxWidth: '400px', width: '90%',
-                                textAlign: 'center', boxShadow: '0 20px 40px rgba(0,0,0,0.3)', position: 'relative'
-                            }}>
-                                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1rem', color: 'var(--accent-1)' }}>
-                                    <CreditCard size={48} />
-                                </div>
-                                <h2 style={{ fontSize: '1.5rem', marginBottom: '0.5rem', color: 'var(--text-main)' }}>Confirm Payment</h2>
-                                <p style={{ color: 'var(--text-muted)', marginBottom: '2rem', lineHeight: '1.5' }}>
-                                    Are you sure you want to securely pay the total amount of <strong style={{ color: 'var(--text-main)' }}>${totalPrice}</strong>?
-                                </p>
-                                <div style={{ display: 'flex', gap: '1rem' }}>
-                                    <button
-                                        className="btn btn-secondary"
-                                        style={{ flex: 1, backgroundColor: 'transparent', border: '1px solid var(--border-color)', color: 'var(--text-main)', padding: '0.8rem', borderRadius: 'var(--radius-md)', cursor: 'pointer' }}
-                                        onClick={() => setShowPaymentModal(false)}
-                                        disabled={isProcessing}
-                                    >
-                                        Cancel
-                                    </button>
-                                    <button
-                                        className="btn btn-primary"
-                                        style={{ flex: 1 }}
-                                        onClick={confirmPaymentHandler}
-                                        disabled={isProcessing}
-                                    >
-                                        {isProcessing ? 'Processing...' : 'Yes, Pay'}
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
                 </>
             )}
         </div>

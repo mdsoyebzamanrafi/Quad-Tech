@@ -200,6 +200,105 @@
     margin: 0.5rem 0;
 }
 
+.coupon-section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+}
+
+.coupon-section-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    color: var(--text-main);
+    font-weight: 700;
+}
+
+.coupon-section-title svg {
+    color: var(--color-accent-1);
+}
+
+.coupon-form {
+    display: grid;
+    gap: 0.75rem;
+}
+
+.coupon-input {
+    width: 100%;
+    min-height: 46px;
+    border-radius: 9999px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-primary);
+    color: var(--text-main);
+    padding: 0.85rem 1rem;
+    font: inherit;
+}
+
+.coupon-input:focus {
+    outline: none;
+    border-color: var(--color-accent-2);
+    box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.12);
+}
+
+.coupon-apply-btn {
+    width: 100%;
+    min-height: 46px;
+    padding: 0.75rem 1rem;
+}
+
+.coupon-message {
+    font-size: 0.9rem;
+    font-weight: 600;
+    line-height: 1.4;
+}
+
+.coupon-message.error {
+    color: var(--color-accent-1);
+}
+
+.coupon-message.success,
+.coupon-discount-row span:last-child {
+    color: var(--color-accent-3);
+}
+
+.applied-coupon-box {
+    display: grid;
+    gap: 0.65rem;
+    padding: 0.85rem;
+    border-radius: 16px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-primary);
+}
+
+.applied-coupon-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.75rem;
+    color: var(--text-muted);
+    font-size: 0.95rem;
+}
+
+.applied-coupon-top strong {
+    color: var(--text-main);
+}
+
+.coupon-remove-btn {
+    padding: 0.35rem 0.65rem;
+    border-radius: 9999px;
+    border: 1px solid var(--border-color);
+    color: var(--text-main);
+    background: var(--bg-secondary);
+    font-size: 0.82rem;
+    font-weight: 700;
+}
+
+.coupon-remove-btn:hover {
+    color: #fff;
+    background: var(--color-accent-1);
+    border-color: var(--color-accent-1);
+}
+
 .checkout-btn {
     margin-top: 1rem;
     padding: 1.25rem;

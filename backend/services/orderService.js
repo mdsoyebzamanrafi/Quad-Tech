@@ -5,6 +5,7 @@ import OrderItem from '../models/OrderItem.js';
 import Product from '../models/Product.js';
 import Cart from '../models/Cart.js';
 import User from '../models/User.js';
+import Coupon from '../models/Coupon.js';
 import {
     AUDIT_ACTIONS,
     AUDIT_ENTITY_TYPES,
@@ -17,7 +18,6 @@ import {
 import {
     cleanString,
     requireObjectId,
-    toRoundedCurrency,
 } from '../validators/commonValidators.js';
 import {
     validateAdminNoteInput,
@@ -28,12 +28,15 @@ import {
 } from '../validators/featureValidators.js';
 import { logAudit, getAuditTrail } from './auditLogService.js';
 import { assertOrderStatusTransition, assertPaymentStatusTransition } from './transitionService.js';
-
-const TAX_RATE = Number(process.env.ORDER_TAX_RATE ?? 0.15);
-const FREE_SHIPPING_THRESHOLD = Number(process.env.ORDER_FREE_SHIPPING_THRESHOLD ?? 100);
-const DEFAULT_SHIPPING_FEE = Number(process.env.ORDER_SHIPPING_FEE ?? 10);
+import {
+    calculateOrderTotals,
+    calculateTokenDiscount,
+    roundPrice,
+    validateCouponForUser,
+} from './discountService.js';
 
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const REWARD_TOKEN_RATE = Number(process.env.REWARD_TOKEN_RATE ?? 5);
 
 const buildPaymentStatusFromMethod = (paymentMethod) => {
     if (paymentMethod === PAYMENT_METHODS.CASH_ON_DELIVERY || paymentMethod === PAYMENT_METHODS.PLACEHOLDER) {
@@ -58,6 +61,18 @@ const formatOrderItemForResponse = (item) => ({
 });
 
 const formatOrderForResponse = (order, orderItems, { includeAuditTrail = false, auditTrail = [] } = {}) => {
+    const grossItemsPrice = order.grossItemsPrice ?? order.subtotal ?? 0;
+    const coupon = {
+        code: order.coupon?.code || '',
+        couponId: order.coupon?.couponId || null,
+        discountAmount: order.coupon?.discountAmount ?? 0,
+    };
+    const tokenDiscount = {
+        tokensUsed: order.tokenDiscount?.tokensUsed ?? 0,
+        discountAmount: order.tokenDiscount?.discountAmount ?? 0,
+        tokensDeducted: order.tokenDiscount?.tokensDeducted ?? false,
+    };
+
     const base = {
         _id: order._id,
         user: order.user,
@@ -65,7 +80,13 @@ const formatOrderForResponse = (order, orderItems, { includeAuditTrail = false, 
         paymentStatus: order.paymentStatus,
         paymentMethod: order.paymentMethod,
         subtotal: order.subtotal,
-        discount: order.discount,
+        grossItemsPrice,
+        netItemsPrice: order.netItemsPrice ?? Math.max(grossItemsPrice - (order.totalDiscount ?? order.discount ?? 0), 0),
+        discount: order.totalDiscount ?? order.discount ?? 0,
+        totalDiscount: order.totalDiscount ?? order.discount ?? 0,
+        coupon,
+        tokenDiscount,
+        rewardTokensEarned: order.rewardTokensEarned ?? 0,
         tax: order.tax,
         shippingFee: order.shippingFee,
         total: order.total,
@@ -98,7 +119,7 @@ const formatOrderForResponse = (order, orderItems, { includeAuditTrail = false, 
         orderItems: orderItems.map(formatOrderItemForResponse),
 
         // Legacy compatibility fields
-        itemsPrice: order.subtotal,
+        itemsPrice: grossItemsPrice,
         taxPrice: order.tax,
         shippingPrice: order.shippingFee,
         totalPrice: order.total,
@@ -264,6 +285,42 @@ const applyOrderStatusTimestamps = (order, newStatus) => {
     if (newStatus === ORDER_STATUSES.FAILED && !order.failedAt) order.failedAt = now;
 };
 
+const normalizeCouponCode = (value) => cleanString(value).toUpperCase();
+
+const calculateEarnedRewardTokens = (orderTotal) => Math.floor(roundPrice(orderTotal) / 100) * REWARD_TOKEN_RATE;
+
+const applySuccessfulPaymentEffects = async ({ order, session, shouldCountOrder }) => {
+    const user = await User.findById(order.user).session(session);
+    if (!user) {
+        throw new ApiError(404, 'User not found');
+    }
+
+    const tokensUsed = order.tokenDiscount?.tokensUsed ?? 0;
+    if (tokensUsed > 0 && !order.tokenDiscount.tokensDeducted) {
+        if ((user.rewardTokens ?? 0) < tokensUsed) {
+            throw new ApiError(400, 'User reward token balance is insufficient for this order');
+        }
+
+        user.rewardTokens = Math.max((user.rewardTokens ?? 0) - tokensUsed, 0);
+        order.tokenDiscount.tokensDeducted = true;
+    }
+
+    if ((order.rewardTokensEarned ?? 0) <= 0) {
+        const earnedTokens = calculateEarnedRewardTokens(order.total);
+        if (earnedTokens > 0) {
+            user.rewardTokens = (user.rewardTokens ?? 0) + earnedTokens;
+        }
+        order.rewardTokensEarned = earnedTokens;
+    }
+
+    if (shouldCountOrder) {
+        user.lifetimeSpent = roundPrice((user.lifetimeSpent ?? 0) + (order.total ?? 0));
+        user.totalOrders = (user.totalOrders ?? 0) + 1;
+    }
+
+    await user.save({ session });
+};
+
 const createOrder = async ({ authenticatedUser, payload }) => {
     const validated = validateCreateOrderInput(payload);
     assertUserCanPlaceOrder(authenticatedUser);
@@ -298,7 +355,7 @@ const createOrder = async ({ authenticatedUser, payload }) => {
         const productMap = new Map(products.map((product) => [String(product._id), product]));
 
         const orderItemDocs = [];
-        let subtotal = 0;
+        let itemsPrice = 0;
 
         for (const item of validated.orderItems) {
             const product = productMap.get(item.productId);
@@ -311,9 +368,9 @@ const createOrder = async ({ authenticatedUser, payload }) => {
                 throw new ApiError(409, `Insufficient stock for product ${product.name}`);
             }
 
-            const unitPrice = toRoundedCurrency(product.price);
-            const lineTotal = toRoundedCurrency(unitPrice * item.quantity);
-            subtotal += lineTotal;
+            const unitPrice = roundPrice(product.price);
+            const lineTotal = roundPrice(unitPrice * item.quantity);
+            itemsPrice += lineTotal;
 
             orderItemDocs.push({
                 product: product._id,
@@ -325,13 +382,32 @@ const createOrder = async ({ authenticatedUser, payload }) => {
             });
         }
 
-        subtotal = toRoundedCurrency(subtotal);
+        itemsPrice = roundPrice(itemsPrice);
 
-        const discount = 0;
-        const taxableAmount = Math.max(subtotal - discount, 0);
-        const tax = toRoundedCurrency(taxableAmount * TAX_RATE);
-        const shippingFee = toRoundedCurrency(subtotal >= FREE_SHIPPING_THRESHOLD ? 0 : DEFAULT_SHIPPING_FEE);
-        const total = toRoundedCurrency(taxableAmount + tax + shippingFee);
+        let coupon = null;
+        let couponDiscount = 0;
+
+        if (validated.couponCode) {
+            coupon = await Coupon.findOne({ code: normalizeCouponCode(validated.couponCode) }).session(session);
+            const couponValidation = validateCouponForUser({
+                coupon,
+                userId: user._id,
+                itemsPrice,
+            });
+            couponDiscount = couponValidation.discountAmount;
+        }
+
+        const remainingAmountAfterCoupon = Math.max(roundPrice(itemsPrice - couponDiscount), 0);
+        const tokenUsage = calculateTokenDiscount({
+            user,
+            requestedTokens: validated.requestedTokens,
+            remainingAmountAfterCoupon,
+        });
+        const totals = calculateOrderTotals({
+            itemsPrice,
+            couponDiscount,
+            tokenDiscount: tokenUsage.discountAmount,
+        });
 
         const paymentStatus = buildPaymentStatusFromMethod(validated.paymentMethod);
 
@@ -342,11 +418,27 @@ const createOrder = async ({ authenticatedUser, payload }) => {
                     orderStatus: ORDER_STATUSES.PENDING,
                     paymentStatus,
                     paymentMethod: validated.paymentMethod,
-                    subtotal,
-                    discount,
-                    tax,
-                    shippingFee,
-                    total,
+                    coupon: coupon
+                        ? {
+                            code: coupon.code,
+                            couponId: coupon._id,
+                            discountAmount: totals.couponDiscount,
+                        }
+                        : undefined,
+                    tokenDiscount: {
+                        tokensUsed: tokenUsage.tokensUsed,
+                        discountAmount: totals.tokenDiscount,
+                        tokensDeducted: false,
+                    },
+                    subtotal: totals.itemsPrice,
+                    grossItemsPrice: totals.grossItemsPrice,
+                    netItemsPrice: totals.netItemsPrice,
+                    discount: totals.totalDiscount,
+                    totalDiscount: totals.totalDiscount,
+                    tax: totals.taxPrice,
+                    shippingFee: totals.shippingPrice,
+                    total: totals.totalPrice,
+                    rewardTokensEarned: 0,
                     shippingName,
                     shippingPhone,
                     shippingAddress: validated.shipping.addressLine,
@@ -366,6 +458,16 @@ const createOrder = async ({ authenticatedUser, payload }) => {
 
         await OrderItem.insertMany(enrichedOrderItems, { session });
 
+        if (coupon) {
+            coupon.usedCount += 1;
+            coupon.usedBy.push({
+                user: user._id,
+                order: createdOrder._id,
+                usedAt: new Date(),
+            });
+            await coupon.save({ session });
+        }
+
         await Cart.updateOne(
             { user: user._id },
             { $set: { items: [] } },
@@ -382,6 +484,8 @@ const createOrder = async ({ authenticatedUser, payload }) => {
             newValue: {
                 orderStatus: createdOrder.orderStatus,
                 paymentStatus: createdOrder.paymentStatus,
+                couponCode: createdOrder.coupon?.code || null,
+                totalDiscount: createdOrder.totalDiscount,
                 total: createdOrder.total,
             },
             note: 'Order created by customer',
@@ -682,7 +786,15 @@ const updatePaymentStatusByAdmin = async ({ orderId, newStatus, actor, note }) =
             throw new ApiError(400, 'Payment can be refunded only for cancelled or refund-requested orders');
         }
 
+        if (
+            targetStatus === PAYMENT_STATUSES.PAID &&
+            [ORDER_STATUSES.CANCELLED, ORDER_STATUSES.REFUNDED, ORDER_STATUSES.FAILED].includes(order.orderStatus)
+        ) {
+            throw new ApiError(400, 'Cancelled, refunded, or failed orders cannot be marked as paid');
+        }
+
         const oldPaymentStatus = order.paymentStatus;
+        const paymentStatusChanged = oldPaymentStatus !== targetStatus;
         order.paymentStatus = targetStatus;
 
         if (targetStatus === PAYMENT_STATUSES.PAID && !order.paidAt) {
@@ -701,19 +813,29 @@ const updatePaymentStatusByAdmin = async ({ orderId, newStatus, actor, note }) =
             orderStatusUpdated = true;
         }
 
+        if (targetStatus === PAYMENT_STATUSES.PAID) {
+            await applySuccessfulPaymentEffects({
+                order,
+                session,
+                shouldCountOrder: oldPaymentStatus !== PAYMENT_STATUSES.PAID,
+            });
+        }
+
         await order.save({ session });
 
-        await logAudit({
-            actorUserId: actor._id,
-            actorRole: actor.role,
-            action: AUDIT_ACTIONS.ORDER_PAYMENT_STATUS_UPDATED,
-            entityType: AUDIT_ENTITY_TYPES.ORDER,
-            entityId: order._id,
-            oldValue: { paymentStatus: oldPaymentStatus },
-            newValue: { paymentStatus: order.paymentStatus },
-            note: noteValue,
-            session,
-        });
+        if (paymentStatusChanged) {
+            await logAudit({
+                actorUserId: actor._id,
+                actorRole: actor.role,
+                action: AUDIT_ACTIONS.ORDER_PAYMENT_STATUS_UPDATED,
+                entityType: AUDIT_ENTITY_TYPES.ORDER,
+                entityId: order._id,
+                oldValue: { paymentStatus: oldPaymentStatus },
+                newValue: { paymentStatus: order.paymentStatus },
+                note: noteValue,
+                session,
+            });
+        }
 
         if (orderStatusUpdated) {
             await logAudit({
