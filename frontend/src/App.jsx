@@ -28,6 +28,8 @@ import CouponListPage from './pages/admin/CouponListPage';
 import CouponCreatePage from './pages/admin/CouponCreatePage';
 import CouponEditPage from './pages/admin/CouponEditPage';
 import SalesDashboardPage from './pages/admin/SalesDashboardPage';
+import AdminProductsPage from './pages/admin/AdminProductsPage';
+import AdminProductFormPage from './pages/admin/AdminProductFormPage';
 import { ThemeProvider } from './context/ThemeContext';
 import { useAuth } from './context/AuthContext';
 
@@ -72,6 +74,9 @@ function AppContent() {
             <Route index element={<Navigate to="/admin/orders" replace />} />
             <Route path="orders" element={<AdminOrdersPage />} />
             <Route path="orders/:id" element={<AdminOrderDetailsPage />} />
+            <Route path="products" element={<AdminProductsPage />} />
+            <Route path="products/new" element={<AdminProductFormPage />} />
+            <Route path="products/:id" element={<AdminProductFormPage />} />
             <Route path="coupons" element={<CouponListPage />} />
             <Route path="coupon/create" element={<CouponCreatePage />} />
             <Route path="coupon/:id/edit" element={<CouponEditPage />} />

@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 
 const reviewSchema = new mongoose.Schema(
     {
-        name: { type: String, required: true },
+        name: { type: String, required: true,trim: true, },
         rating: { type: Number, required: true },
         comment: { type: String, required: true },
         user: {
@@ -26,22 +26,27 @@ const productSchema = new mongoose.Schema(
         name: {
             type: String,
             required: true,
+            trim: true,
         },
         image: {
             type: String,
             required: true,
+            trim: true,
         },
         brand: {
             type: String,
             required: true,
+            trim: true,
         },
         category: {
             type: String,
             required: true,
+            trim: true,
         },
         description: {
             type: String,
             required: true,
+            trim: true,
         },
         reviews: [reviewSchema],
         rating: {
@@ -58,16 +63,28 @@ const productSchema = new mongoose.Schema(
             type: Number,
             required: true,
             default: 0,
+            min: [0, 'Price cannot be negative'],
         },
         countInStock: {
             type: Number,
             required: true,
             default: 0,
+            min: [0, 'Stock cannot be negative'],
+            validate: {
+                validator: Number.isInteger,
+                message: 'Stock must be a whole number',
+            },
+        },
+        isActive: {
+            type: Boolean,
+            default: true,
         },
     },
+    
     {
         timestamps: true,
     }
+    
 );
 
 const Product = mongoose.model('Product', productSchema);

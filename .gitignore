@@ -19,6 +19,11 @@ frontend/.env
 npm-debug.log*
 yarn-debug.log*
 
+# Local workspace artifacts
+.postman/
+postman/
+Quad-Tech/
+
 # Editor files
 .vscode/
 .idea/
