@@ -27,8 +27,8 @@ Welcome to **Quad Tech**, a premium e-commerce platform built with the MERN stac
 
 ### 1. Clone the repository
 ```bash
-git clone https://github.com/your-username/tiger-tech.git
-cd tiger-tech
+git clone https://github.com/mdsoyebzamanrafi/Quad-Tech.git
+cd Quad-Tech
 ```
 
 ### 2. Setup the Backend
