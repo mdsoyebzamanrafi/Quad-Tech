@@ -1,11 +1,26 @@
 import React, { useState } from 'react';
-import { ShoppingCart, User, Search, Sun, Moon, LogOut, Package, Menu, X, ShieldCheck } from 'lucide-react';
+import {
+    ShoppingCart,
+    User,
+    Search,
+    Sun,
+    Moon,
+    LogOut,
+    Package,
+    Menu,
+    X,
+    ShieldCheck,
+} from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { isAdminUser } from '../utils/adminUtils';
+import {
+    ELECTRONICS_NAV_CATEGORIES,
+    FASHION_NAV_CATEGORIES,
+} from '../utils/catalog';
 import '../styles/Navbar.css';
 
 const Navbar = () => {
@@ -36,12 +51,13 @@ const Navbar = () => {
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
-    // Fetch suggestions as user types (debounced)
     React.useEffect(() => {
         const delayDebounceFn = setTimeout(async () => {
             if (keyword.trim().length > 1) {
                 try {
-                    const { data } = await api.get(`/api/products/search/suggestions?q=${keyword}`);
+                    const { data } = await api.get(
+                        `/api/products/search/suggestions?q=${encodeURIComponent(keyword)}`
+                    );
                     setSuggestions(data);
                     setShowSuggestions(true);
                 } catch (error) {
@@ -62,42 +78,78 @@ const Navbar = () => {
     };
 
     const submitHandler = (e) => {
-        if (e) e.preventDefault();
+        if (e) {
+            e.preventDefault();
+        }
+
         if (keyword.trim()) {
-            navigate(`/?keyword=${keyword}`);
+            navigate(`/?keyword=${encodeURIComponent(keyword.trim())}`);
             setShowSuggestions(false);
         } else {
             navigate('/');
         }
     };
 
-    const suggestionClickHandler = (sug) => {
-        setKeyword(sug);
+    const suggestionClickHandler = (suggestion) => {
+        setKeyword(suggestion);
         setShowSuggestions(false);
-        navigate(`/?keyword=${sug}`);
+        navigate(`/?keyword=${encodeURIComponent(suggestion)}`);
     };
+
+    const closeSidebar = () => {
+        setIsSidebarOpen(false);
+    };
+
+    const getCategoryLink = (department, category) =>
+        `/?department=${encodeURIComponent(department)}&category=${encodeURIComponent(category)}`;
 
     return (
         <header className="navbar-container glass">
-            {/* Overlay for sidebar */}
             {isSidebarOpen && (
-                <div className="sidebar-overlay" onClick={() => setIsSidebarOpen(false)}></div>
+                <div className="sidebar-overlay" onClick={closeSidebar}></div>
             )}
 
-            {/* Sidebar */}
             <div className={`categories-sidebar glass ${isSidebarOpen ? 'open' : ''}`}>
                 <div className="sidebar-header">
-                    <h3>Categories</h3>
-                    <button onClick={() => setIsSidebarOpen(false)} className="close-sidebar-btn">
+                    <h3>Browse Marketplace</h3>
+                    <button onClick={closeSidebar} className="close-sidebar-btn">
                         <X size={24} />
                     </button>
                 </div>
                 <div className="sidebar-content">
-                    {['Smartphones', 'Laptops', 'Wearables', 'Audio', 'Gaming', 'Smart Home', 'Cameras', 'Tablets', 'Accessories', 'Drones'].map(cat => (
-                        <Link key={cat} to={`/?category=${cat}`} className="sidebar-category-link" onClick={() => setIsSidebarOpen(false)}>
-                            {cat}
-                        </Link>
-                    ))}
+                    <Link to="/" className="sidebar-category-link sidebar-home-link" onClick={closeSidebar}>
+                        All Departments
+                    </Link>
+
+                    <div className="sidebar-section">
+                        <p className="sidebar-section-title">Electronics</p>
+                        {ELECTRONICS_NAV_CATEGORIES.map((category) => (
+                            <Link
+                                key={category}
+                                to={getCategoryLink('electronics', category)}
+                                className="sidebar-category-link"
+                                onClick={closeSidebar}
+                            >
+                                {category}
+                            </Link>
+                        ))}
+                    </div>
+
+                    <hr className="sidebar-divider" />
+
+                    <div className="sidebar-section">
+                        <p className="sidebar-section-title">Fashion</p>
+                        {FASHION_NAV_CATEGORIES.map((category) => (
+                            <Link
+                                key={category}
+                                to={getCategoryLink('fashion', category)}
+                                className="sidebar-category-link"
+                                onClick={closeSidebar}
+                            >
+                                {category}
+                            </Link>
+                        ))}
+                    </div>
                 </div>
             </div>
 
@@ -114,9 +166,9 @@ const Navbar = () => {
                 <div className="search-container desktop-search" ref={searchRef}>
                     <form onSubmit={submitHandler} className="search-bar">
                         <Search size={18} className="search-icon" />
-                        <input 
-                            type="text" 
-                            placeholder="Search for luxury..." 
+                        <input
+                            type="text"
+                            placeholder="Search electronics, fashion, brands..."
                             value={keyword}
                             onChange={(e) => setKeyword(e.target.value)}
                             onFocus={() => keyword.trim().length > 1 && setShowSuggestions(true)}
@@ -124,14 +176,14 @@ const Navbar = () => {
                     </form>
                     {showSuggestions && suggestions.length > 0 && (
                         <div className="search-suggestions glass animate-fade-in">
-                            {suggestions.map((sug, index) => (
-                                <div 
-                                    key={index} 
+                            {suggestions.map((suggestion, index) => (
+                                <div
+                                    key={`${suggestion}-${index}`}
                                     className="suggestion-item"
-                                    onClick={() => suggestionClickHandler(sug)}
+                                    onClick={() => suggestionClickHandler(suggestion)}
                                 >
                                     <Search size={14} className="sug-icon" />
-                                    <span>{sug}</span>
+                                    <span>{suggestion}</span>
                                 </div>
                             ))}
                         </div>
@@ -139,14 +191,14 @@ const Navbar = () => {
                 </div>
 
                 <nav className="nav-links">
-                    <button 
-                        onClick={() => setIsMobileSearchOpen(!isMobileSearchOpen)} 
-                        className="mobile-search-toggle" 
+                    <button
+                        onClick={() => setIsMobileSearchOpen(!isMobileSearchOpen)}
+                        className="mobile-search-toggle"
                         aria-label="Toggle Search"
                     >
                         {isMobileSearchOpen ? <X size={20} /> : <Search size={20} />}
                     </button>
-                    
+
                     <button onClick={toggleTheme} className="theme-toggle" aria-label="Toggle Theme">
                         {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
                     </button>
@@ -170,7 +222,11 @@ const Navbar = () => {
                                             <ShieldCheck size={16} /> Admin
                                         </Link>
                                     )}
-                                    <button onClick={logoutHandler} className="dropdown-item" style={{ color: 'var(--error)' }}>
+                                    <button
+                                        onClick={logoutHandler}
+                                        className="dropdown-item"
+                                        style={{ color: 'var(--error)' }}
+                                    >
                                         <LogOut size={16} /> Logout
                                     </button>
                                 </div>
@@ -188,44 +244,48 @@ const Navbar = () => {
                         <span>Cart</span>
                         {cartItems.length > 0 && (
                             <div className="cart-badge">
-                                {cartItems.reduce((a, c) => a + c.qty, 0)}
+                                {cartItems.reduce((accumulator, currentItem) => accumulator + currentItem.qty, 0)}
                             </div>
                         )}
                     </Link>
                 </nav>
             </div>
-            
-            {/* Mobile Search Dropdown */}
+
             {isMobileSearchOpen && (
                 <div className="mobile-search-container glass animate-fade-in">
-                    <form 
-                        onSubmit={(e) => { setIsMobileSearchOpen(false); submitHandler(e); }} 
+                    <form
+                        onSubmit={(e) => {
+                            setIsMobileSearchOpen(false);
+                            submitHandler(e);
+                        }}
                         className="mobile-search-bar"
                     >
-                        <input 
-                            type="text" 
-                            placeholder="Search Quad Tech..." 
+                        <input
+                            type="text"
+                            placeholder="Search electronics or fashion..."
                             value={keyword}
                             onChange={(e) => setKeyword(e.target.value)}
                             onFocus={() => keyword.trim().length > 1 && setShowSuggestions(true)}
                             autoFocus
                         />
-                        <button type="submit" className="mobile-search-submit"><Search size={18} /></button>
+                        <button type="submit" className="mobile-search-submit">
+                            <Search size={18} />
+                        </button>
                     </form>
-                    
+
                     {showSuggestions && suggestions.length > 0 && (
                         <div className="search-suggestions glass animate-fade-in" style={{ position: 'relative', marginTop: '10px' }}>
-                            {suggestions.map((sug, index) => (
-                                <div 
-                                    key={index} 
+                            {suggestions.map((suggestion, index) => (
+                                <div
+                                    key={`${suggestion}-${index}`}
                                     className="suggestion-item"
-                                    onClick={() => { 
-                                        setIsMobileSearchOpen(false); 
-                                        suggestionClickHandler(sug); 
+                                    onClick={() => {
+                                        setIsMobileSearchOpen(false);
+                                        suggestionClickHandler(suggestion);
                                     }}
                                 >
                                     <Search size={14} className="sug-icon" />
-                                    <span>{sug}</span>
+                                    <span>{suggestion}</span>
                                 </div>
                             ))}
                         </div>

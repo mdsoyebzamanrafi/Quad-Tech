@@ -1,9 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ShoppingCart, ArrowLeft, Star, ShieldCheck, Truck } from 'lucide-react';
+import { ShoppingCart, ArrowLeft, Star, ShieldCheck, Truck, Ruler, Palette } from 'lucide-react';
 import '../styles/ProductDetails.css';
 import api from '../utils/api';
 import { useCart } from '../context/CartContext';
+import {
+    buildFashionMetaLine,
+    getDepartmentLabel,
+    normalizeDepartment,
+    normalizeStringList,
+} from '../utils/productUtils';
 
 const ProductDetails = () => {
     const { id } = useParams();
@@ -21,11 +27,12 @@ const ProductDetails = () => {
                 const { data } = await api.get(`/api/products/${id}`);
                 setProduct(data);
                 setLoading(false);
-            } catch (err) {
-                setError(err.response?.data?.message || err.message || 'Product not found');
+            } catch (fetchError) {
+                setError(fetchError.response?.data?.message || fetchError.message || 'Product not found');
                 setLoading(false);
             }
         };
+
         fetchProduct();
     }, [id]);
 
@@ -34,9 +41,81 @@ const ProductDetails = () => {
         navigate('/cart');
     };
 
-    if (loading) return <div className="container" style={{ paddingTop: '6rem', textAlign: 'center' }}><h2>Loading Product...</h2></div>;
-    if (error) return <div className="container" style={{ paddingTop: '6rem', textAlign: 'center', color: 'var(--accent-1)' }}><h2>Error: {error}</h2></div>;
-    if (!product) return null;
+    const normalizedProduct = useMemo(() => {
+        if (!product) {
+            return null;
+        }
+
+        return {
+            ...product,
+            department: normalizeDepartment(product.department),
+            colors: normalizeStringList(product.colors),
+            sizes: normalizeStringList(product.sizes),
+            styleTags: normalizeStringList(product.styleTags),
+        };
+    }, [product]);
+
+    const productHighlights = useMemo(() => {
+        if (!normalizedProduct) {
+            return [];
+        }
+
+        if (normalizedProduct.department === 'fashion') {
+            return [
+                { icon: <Ruler size={20} />, text: 'Easy size exchange available' },
+                { icon: <Truck size={20} />, text: 'Fast nationwide fashion delivery' },
+            ];
+        }
+
+        return [
+            { icon: <ShieldCheck size={20} />, text: '1 Year Premium Warranty' },
+            { icon: <Truck size={20} />, text: 'Free Next-Day Shipping' },
+        ];
+    }, [normalizedProduct]);
+
+    const fashionDetailRows = useMemo(() => {
+        if (!normalizedProduct || normalizedProduct.department !== 'fashion') {
+            return [];
+        }
+
+        return [
+            { label: 'Gender', value: normalizedProduct.gender },
+            { label: 'Available Colors', value: normalizedProduct.colors.join(', ') },
+            { label: 'Available Sizes', value: normalizedProduct.sizes.join(', ') },
+            { label: 'Material', value: normalizedProduct.material },
+            { label: 'Fit', value: normalizedProduct.fit },
+            { label: 'Occasion', value: normalizedProduct.occasion },
+            { label: 'Season', value: normalizedProduct.season },
+            { label: 'Style Tags', value: normalizedProduct.styleTags.join(', ') },
+            { label: 'Product Type', value: normalizedProduct.productType },
+        ].filter((row) => typeof row.value === 'string' && row.value.trim());
+    }, [normalizedProduct]);
+
+    if (loading) {
+        return (
+            <div className="container" style={{ paddingTop: '6rem', textAlign: 'center' }}>
+                <h2>Loading Product...</h2>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div
+                className="container"
+                style={{ paddingTop: '6rem', textAlign: 'center', color: 'var(--accent-1)' }}
+            >
+                <h2>Error: {error}</h2>
+            </div>
+        );
+    }
+
+    if (!normalizedProduct) {
+        return null;
+    }
+
+    const departmentLabel = getDepartmentLabel(normalizedProduct.department);
+    const fashionMeta = buildFashionMetaLine(normalizedProduct);
 
     return (
         <div className="product-details-container container animate-fade-in">
@@ -47,61 +126,106 @@ const ProductDetails = () => {
             <div className="product-details-grid">
                 <div className="product-image-box">
                     <div className="image-blob-bg"></div>
-                    <img src={product.image} alt={product.name} />
+                    <img src={normalizedProduct.image} alt={normalizedProduct.name} />
                 </div>
 
                 <div className="product-info-box">
-                    <div className="brand-badge">{product.brand}</div>
-                    <h1 className="product-title">{product.name}</h1>
+                    <div className="brand-badge">{normalizedProduct.brand}</div>
+                    <div className="product-detail-badges">
+                        <span className={`detail-pill detail-${normalizedProduct.department}`}>{departmentLabel}</span>
+                        <span className="detail-pill detail-category">{normalizedProduct.category}</span>
+                        {normalizedProduct.isNewArrival && <span className="detail-pill detail-new">New Arrival</span>}
+                        {normalizedProduct.isSponsored && <span className="detail-pill detail-sponsored">Sponsored</span>}
+                    </div>
+
+                    <h1 className="product-title">{normalizedProduct.name}</h1>
 
                     <div className="rating-container">
                         <div className="stars">
-                            <Star className="star-icon filled" size={18} fill="currentColor" />
-                            <Star className="star-icon filled" size={18} fill="currentColor" />
-                            <Star className="star-icon filled" size={18} fill="currentColor" />
-                            <Star className="star-icon filled" size={18} fill="currentColor" />
-                            <Star className="star-icon half" size={18} fill="currentColor" />
+                            {[0, 1, 2, 3, 4].map((starIndex) => (
+                                <Star
+                                    key={starIndex}
+                                    className={`star-icon ${
+                                        normalizedProduct.rating >= starIndex + 1
+                                            ? 'filled'
+                                            : normalizedProduct.rating >= starIndex + 0.5
+                                                ? 'half'
+                                                : 'empty'
+                                    }`}
+                                    size={18}
+                                    fill="currentColor"
+                                />
+                            ))}
                         </div>
-                        <span className="reviews-count">({product.numReviews} Reviews)</span>
+                        <span className="reviews-count">
+                            ({normalizedProduct.numReviews || 0} Reviews)
+                        </span>
                     </div>
 
-                    <div className="price-tag text-gradient">${product.price.toFixed(2)}</div>
+                    <div className="price-tag text-gradient">${Number(normalizedProduct.price || 0).toFixed(2)}</div>
 
-                    <p className="product-description">{product.description}</p>
+                    <p className="product-description">{normalizedProduct.description}</p>
+
+                    {fashionMeta && (
+                        <div className="fashion-highlight">
+                            <Palette size={18} />
+                            <span>{fashionMeta}</span>
+                        </div>
+                    )}
+
+                    {fashionDetailRows.length > 0 && (
+                        <div className="fashion-details-card glass">
+                            <h3>Fashion Details</h3>
+                            <div className="fashion-details-grid">
+                                {fashionDetailRows.map((row) => (
+                                    <div key={row.label} className="fashion-detail-row">
+                                        <span>{row.label}</span>
+                                        <strong>{row.value}</strong>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
 
                     <div className="product-features">
-                        <div className="feature">
-                            <div className="feature-icon"><ShieldCheck size={20} /></div>
-                            <span>1 Year Premium Warranty</span>
-                        </div>
-                        <div className="feature">
-                            <div className="feature-icon"><Truck size={20} /></div>
-                            <span>Free Next-Day Shipping</span>
-                        </div>
+                        {productHighlights.map((highlight) => (
+                            <div key={highlight.text} className="feature">
+                                <div className="feature-icon">{highlight.icon}</div>
+                                <span>{highlight.text}</span>
+                            </div>
+                        ))}
                     </div>
                 </div>
 
                 <div className="product-action-box glass">
                     <div className="action-row">
                         <span className="action-label">Price</span>
-                        <strong className="action-value">${product.price.toFixed(2)}</strong>
+                        <strong className="action-value">${Number(normalizedProduct.price || 0).toFixed(2)}</strong>
                     </div>
 
                     <div className="action-row">
                         <span className="action-label">Status</span>
-                        <strong className={`action-value ${product.countInStock > 0 ? 'text-success' : 'text-error'}`}>
-                            {product.countInStock > 0 ? 'In Stock' : 'Out of Stock'}
+                        <strong
+                            className={`action-value ${
+                                normalizedProduct.countInStock > 0 ? 'text-success' : 'text-error'
+                            }`}
+                        >
+                            {normalizedProduct.countInStock > 0 ? 'In Stock' : 'Out of Stock'}
                         </strong>
                     </div>
 
-                    {product.countInStock > 0 && (
+                    {normalizedProduct.countInStock > 0 && (
                         <div className="action-row">
                             <span className="action-label">Quantity</span>
                             <div className="custom-select-wrapper">
-                                <select value={qty} onChange={(e) => setQty(Number(e.target.value))} className="qty-select">
-                                    {[...Array(product.countInStock).keys()].map((x) => (
-                                        <option key={x + 1} value={x + 1}>
-                                            {x + 1}
+                                <select
+                                    value={qty}
+                                    onChange={(event) => setQty(Number(event.target.value))}
+                                    className="qty-select"
+                                >
+                                    {[...Array(normalizedProduct.countInStock).keys()].map((value) => (
+                                        <option key={value + 1} value={value + 1}>
+                                            {value + 1}
                                         </option>
                                     ))}
                                 </select>
@@ -112,7 +236,7 @@ const ProductDetails = () => {
                     <div className="action-button-wrapper">
                         <button
                             className="btn btn-primary btn-full"
-                            disabled={product.countInStock === 0}
+                            disabled={normalizedProduct.countInStock === 0}
                             onClick={addToCartHandler}
                         >
                             <ShoppingCart size={20} /> Add To Cart

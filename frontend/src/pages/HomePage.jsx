@@ -1,11 +1,40 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useInView } from 'react-intersection-observer';
-import { ArrowRight, Sparkles, Filter, Search } from 'lucide-react';
+import { Sparkles, Filter, Search } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import '../styles/HomePage.css';
 import api from '../utils/api';
+import { DEPARTMENT_OPTIONS } from '../utils/catalog';
+import {
+    buildFashionMetaLine,
+    getDepartmentLabel,
+    getStockStatusLabel,
+    matchesProductKeyword,
+    normalizeDepartment,
+    normalizeStringList,
+} from '../utils/productUtils';
 
-// Helper component for animated sections
+const DEFAULT_FILTERS = {
+    department: 'all',
+    category: 'all',
+    brand: 'all',
+    priceRange: 'all',
+    gender: 'all',
+    size: 'all',
+    color: 'all',
+    season: 'all',
+    occasion: 'all',
+    styleTag: 'all',
+};
+
+const PRICE_RANGES = [
+    { value: 'all', label: 'All Prices' },
+    { value: 'under-1000', label: 'Under 1000', min: 0, max: 999 },
+    { value: '1000-2500', label: '1000 - 2500', min: 1000, max: 2500 },
+    { value: '2501-5000', label: '2501 - 5000', min: 2501, max: 5000 },
+    { value: '5001-plus', label: '5001+', min: 5001, max: Infinity },
+];
+
 const FadeInSection = ({ children, delay = 0 }) => {
     const { ref, inView } = useInView({
         triggerOnce: true,
@@ -27,30 +56,27 @@ const HomePage = () => {
     const [allProducts, setAllProducts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [selectedCategory, setSelectedCategory] = useState('Default'); // Default view
     const [keyword, setKeyword] = useState('');
-    const [showCategories, setShowCategories] = useState(false);
+    const [filters, setFilters] = useState(DEFAULT_FILTERS);
+    const [isLandingView, setIsLandingView] = useState(true);
 
     const navigate = useNavigate();
-
-    // Listen for query parameters from Navbar dropdown
     const location = useLocation();
 
     useEffect(() => {
         const fetchProducts = async () => {
             try {
-                // Fetch all products (limit high to ensure we get all 100)
-                const { data } = await api.get('/api/products?limit=200');
-
-                // Ensure they are sorted by newest first
-                const sortedProducts = (data.products || data).sort((a, b) =>
-                    new Date(b.createdAt) - new Date(a.createdAt)
+                const { data } = await api.get('/api/products?limit=500');
+                const products = Array.isArray(data) ? data : data.products || [];
+                const sortedProducts = products.sort(
+                    (firstProduct, secondProduct) =>
+                        new Date(secondProduct.createdAt || 0) - new Date(firstProduct.createdAt || 0)
                 );
 
                 setAllProducts(sortedProducts);
                 setLoading(false);
-            } catch (err) {
-                setError(err.message || 'Failed to fetch products');
+            } catch (fetchError) {
+                setError(fetchError.message || 'Failed to fetch products');
                 setLoading(false);
             }
         };
@@ -58,125 +84,369 @@ const HomePage = () => {
         fetchProducts();
     }, []);
 
-    // Handle deep linking from Navbar
     useEffect(() => {
         const params = new URLSearchParams(location.search);
-        const categoryParam = params.get('category');
-        const keywordParam = params.get('keyword');
+        const queryKeyword = params.get('keyword') || '';
+        const queryDepartment = params.get('department') || 'all';
+        const queryCategory = params.get('category') || 'all';
+        const queryBrand = params.get('brand') || 'all';
+        const hasQueryParams = Array.from(params.keys()).length > 0;
 
-        if (keywordParam) {
-            setKeyword(keywordParam);
-            setSelectedCategory('All');
-            setShowCategories(false);
+        if (hasQueryParams) {
+            setKeyword(queryKeyword);
+            setFilters({
+                ...DEFAULT_FILTERS,
+                department: ['fashion', 'electronics'].includes(queryDepartment)
+                    ? queryDepartment
+                    : 'all',
+                category: queryCategory,
+                brand: queryBrand,
+            });
+            setIsLandingView(false);
             window.scrollTo({ top: 0, behavior: 'smooth' });
-        } else if (categoryParam) {
-            setSelectedCategory(categoryParam);
+        } else {
             setKeyword('');
-            setShowCategories(true);
-            // Scroll up to top since Hero is hidden
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-        } else if (location.search === '' && (selectedCategory !== 'Default' || keyword !== '')) {
-            // Reset to default home page view
-            setSelectedCategory('Default');
-            setKeyword('');
-            setShowCategories(false);
-            window.scrollTo({ top: 0, behavior: 'smooth' });
+            setFilters(DEFAULT_FILTERS);
+            setIsLandingView(true);
         }
-    }, [location]);
+    }, [location.search]);
 
-    // Extract unique categories from products
-    const categories = useMemo(() => {
-        const cats = [...new Set(allProducts.map(p => p.category))];
-        return cats.sort();
-    }, [allProducts]);
+    const normalizedProducts = useMemo(
+        () =>
+            allProducts.map((product) => ({
+                ...product,
+                department: normalizeDepartment(product.department),
+                colors: normalizeStringList(product.colors),
+                sizes: normalizeStringList(product.sizes),
+                styleTags: normalizeStringList(product.styleTags),
+            })),
+        [allProducts]
+    );
 
-    // Compute derived products to display based on category filters
+    const productsForSelectedDepartment = useMemo(() => {
+        if (filters.department === 'all') {
+            return normalizedProducts;
+        }
+
+        return normalizedProducts.filter((product) => product.department === filters.department);
+    }, [filters.department, normalizedProducts]);
+
+    const availableCategories = useMemo(() => {
+        const categorySet = new Set(productsForSelectedDepartment.map((product) => product.category).filter(Boolean));
+        return Array.from(categorySet).sort((firstCategory, secondCategory) =>
+            firstCategory.localeCompare(secondCategory)
+        );
+    }, [productsForSelectedDepartment]);
+
+    const productsForBrandOptions = useMemo(() => {
+        return productsForSelectedDepartment.filter((product) => {
+            if (filters.category !== 'all' && product.category !== filters.category) {
+                return false;
+            }
+
+            return true;
+        });
+    }, [filters.category, productsForSelectedDepartment]);
+
+    const availableBrands = useMemo(() => {
+        const brandSet = new Set(productsForBrandOptions.map((product) => product.brand).filter(Boolean));
+        return Array.from(brandSet).sort((firstBrand, secondBrand) => firstBrand.localeCompare(secondBrand));
+    }, [productsForBrandOptions]);
+
+    const fashionOptionSource = useMemo(() => {
+        return normalizedProducts.filter((product) => {
+            if (product.department !== 'fashion') {
+                return false;
+            }
+
+            if (filters.department === 'electronics') {
+                return false;
+            }
+
+            if (filters.category !== 'all' && product.category !== filters.category) {
+                return false;
+            }
+
+            if (filters.brand !== 'all' && product.brand !== filters.brand) {
+                return false;
+            }
+
+            if (keyword && !matchesProductKeyword(product, keyword)) {
+                return false;
+            }
+
+            return true;
+        });
+    }, [filters.brand, filters.category, filters.department, keyword, normalizedProducts]);
+
+    const getUniqueOptions = (selector) =>
+        Array.from(
+            new Set(
+                fashionOptionSource
+                    .flatMap((product) => selector(product))
+                    .filter((value) => typeof value === 'string' && value.trim())
+            )
+        ).sort((firstValue, secondValue) => firstValue.localeCompare(secondValue));
+
+    const fashionFilterOptions = useMemo(
+        () => ({
+            genders: getUniqueOptions((product) => [product.gender]),
+            sizes: getUniqueOptions((product) => product.sizes),
+            colors: getUniqueOptions((product) => product.colors),
+            seasons: getUniqueOptions((product) => [product.season]),
+            occasions: getUniqueOptions((product) => [product.occasion]),
+            styleTags: getUniqueOptions((product) => product.styleTags),
+        }),
+        [fashionOptionSource]
+    );
+
+    const hasFiltersApplied = useMemo(
+        () =>
+            Boolean(keyword) ||
+            Object.entries(filters).some(([, value]) => value !== 'all'),
+        [filters, keyword]
+    );
+
     const displayedProducts = useMemo(() => {
-        // Return empty array if products haven't loaded yet
-        if (!allProducts || allProducts.length === 0) {
-            return [];
+        let filteredProducts = [...normalizedProducts];
+
+        if (keyword) {
+            filteredProducts = filteredProducts.filter((product) => matchesProductKeyword(product, keyword));
         }
 
-        // Priority 1: Keyword Search
-        if (keyword) {
-            const query = keyword.toLowerCase();
-            return allProducts.filter(p => 
-                p.name.toLowerCase().includes(query) || 
-                p.category.toLowerCase().includes(query)
+        if (filters.department !== 'all') {
+            filteredProducts = filteredProducts.filter(
+                (product) => product.department === filters.department
             );
         }
 
-        // Priority 2: Home Page Default View: 1 latest item per category (max 10)
-        if (selectedCategory === 'Default') {
-            const uniqueCategories = new Set();
-            const defaultSelection = [];
-
-            for (const product of allProducts) {
-                if (!uniqueCategories.has(product.category)) {
-                    uniqueCategories.add(product.category);
-                    defaultSelection.push(product);
-                }
-                if (defaultSelection.length >= 10) break;
-            }
-            return defaultSelection;
+        if (filters.category !== 'all') {
+            filteredProducts = filteredProducts.filter(
+                (product) => product.category === filters.category
+            );
         }
 
-        // Priority 3: Specific Category View: Filter by exact match
-        return allProducts.filter((product) => product.category === selectedCategory);
-    }, [allProducts, selectedCategory, keyword]);
+        if (filters.brand !== 'all') {
+            filteredProducts = filteredProducts.filter(
+                (product) => product.brand === filters.brand
+            );
+        }
 
-    if (loading) return <div className="container" style={{ paddingTop: '6rem', textAlign: 'center' }}><h2>Loading Products...</h2></div>;
-    if (error) return <div className="container" style={{ paddingTop: '6rem', textAlign: 'center', color: 'var(--accent-1)' }}><h2>Error: {error}</h2></div>;
+        if (filters.priceRange !== 'all') {
+            const selectedPriceRange = PRICE_RANGES.find(
+                (priceRange) => priceRange.value === filters.priceRange
+            );
 
-    const handleBrowseCategories = (e) => {
-        e.preventDefault();
-        setShowCategories(true);
-        setSelectedCategory('Accessories');
+            if (selectedPriceRange) {
+                filteredProducts = filteredProducts.filter((product) => {
+                    const price = Number(product.price) || 0;
+                    return price >= selectedPriceRange.min && price <= selectedPriceRange.max;
+                });
+            }
+        }
 
-        // Scroll to top since Hero is hidden
+        if (filters.department === 'fashion') {
+            if (filters.gender !== 'all') {
+                filteredProducts = filteredProducts.filter(
+                    (product) => product.gender === filters.gender
+                );
+            }
+
+            if (filters.size !== 'all') {
+                filteredProducts = filteredProducts.filter((product) =>
+                    product.sizes.includes(filters.size)
+                );
+            }
+
+            if (filters.color !== 'all') {
+                filteredProducts = filteredProducts.filter((product) =>
+                    product.colors.includes(filters.color)
+                );
+            }
+
+            if (filters.season !== 'all') {
+                filteredProducts = filteredProducts.filter(
+                    (product) => product.season === filters.season
+                );
+            }
+
+            if (filters.occasion !== 'all') {
+                filteredProducts = filteredProducts.filter(
+                    (product) => product.occasion === filters.occasion
+                );
+            }
+
+            if (filters.styleTag !== 'all') {
+                filteredProducts = filteredProducts.filter((product) =>
+                    product.styleTags.includes(filters.styleTag)
+                );
+            }
+        }
+
+        if (!hasFiltersApplied && isLandingView) {
+            const uniqueCategories = new Set();
+            const highlightProducts = [];
+
+            for (const product of filteredProducts) {
+                if (!uniqueCategories.has(product.category)) {
+                    uniqueCategories.add(product.category);
+                    highlightProducts.push(product);
+                }
+
+                if (highlightProducts.length >= 12) {
+                    break;
+                }
+            }
+
+            return highlightProducts;
+        }
+
+        return filteredProducts;
+    }, [filters, hasFiltersApplied, isLandingView, keyword, normalizedProducts]);
+
+    const sectionTitle = useMemo(() => {
+        if (keyword) {
+            return `Results for "${keyword}"`;
+        }
+
+        if (!hasFiltersApplied && isLandingView) {
+            return 'Marketplace Highlights';
+        }
+
+        if (filters.category !== 'all') {
+            return `${filters.category} Collection`;
+        }
+
+        if (filters.department === 'fashion') {
+            return 'Fashion Collection';
+        }
+
+        if (filters.department === 'electronics') {
+            return 'Electronics Collection';
+        }
+
+        return 'All Products';
+    }, [filters.category, filters.department, hasFiltersApplied, isLandingView, keyword]);
+
+    const updateFilter = (key, value) => {
+        setIsLandingView(false);
+        setFilters((currentFilters) => ({
+            ...currentFilters,
+            [key]: value,
+            ...(key === 'department'
+                ? {
+                    category: 'all',
+                    brand: 'all',
+                    gender: 'all',
+                    size: 'all',
+                    color: 'all',
+                    season: 'all',
+                    occasion: 'all',
+                    styleTag: 'all',
+                }
+                : {}),
+            ...(key === 'category'
+                ? {
+                    brand: 'all',
+                    gender: 'all',
+                    size: 'all',
+                    color: 'all',
+                    season: 'all',
+                    occasion: 'all',
+                    styleTag: 'all',
+                }
+                : {}),
+            ...(key === 'brand'
+                ? {
+                    gender: 'all',
+                    size: 'all',
+                    color: 'all',
+                    season: 'all',
+                    occasion: 'all',
+                    styleTag: 'all',
+                }
+                : {}),
+        }));
+    };
+
+    const resetFilters = () => {
+        setKeyword('');
+        setFilters(DEFAULT_FILTERS);
+        setIsLandingView(true);
+        navigate('/');
+    };
+
+    const handleBrowseCategories = (event) => {
+        event.preventDefault();
+        setIsLandingView(false);
+        setFilters(DEFAULT_FILTERS);
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
+    if (loading) {
+        return (
+            <div className="container" style={{ paddingTop: '6rem', textAlign: 'center' }}>
+                <h2>Loading Products...</h2>
+            </div>
+        );
+    }
+
+    if (error) {
+        return (
+            <div
+                className="container"
+                style={{ paddingTop: '6rem', textAlign: 'center', color: 'var(--accent-1)' }}
+            >
+                <h2>Error: {error}</h2>
+            </div>
+        );
+    }
+
     return (
         <div className="home-page animate-fade-in">
-            {/* Hero Section - Only visible on Default Landing Page */}
-            {selectedCategory === 'Default' && !keyword && !showCategories && (
+            {isLandingView && !keyword && (
                 <section className="hero-section full-width-hero">
                     <div className="hero-content">
                         <FadeInSection delay={0}>
                             <div className="badge-pill">
                                 <Sparkles size={16} className="text-accent-1" />
-                                <span>Introducing the Quad Tech Collection</span>
+                                <span>Mixed marketplace for electronics and fashion</span>
                             </div>
                         </FadeInSection>
 
                         <FadeInSection delay={200}>
                             <h1 className="hero-title">
-                                Technology that feels <br />
-                                <span className="text-gradient">like magic.</span>
+                                Technology and style, <br />
+                                <span className="text-gradient">side by side.</span>
                             </h1>
                         </FadeInSection>
 
                         <FadeInSection delay={400}>
                             <p className="hero-subtitle">
-                                Discover devices crafted with uncompromising quality,
-                                designed to inspire your everyday moments.
+                                Discover laptops, headphones, sneakers, festive wear, and everyday essentials
+                                in one curated Quad Tech marketplace.
                             </p>
                         </FadeInSection>
 
                         <FadeInSection delay={600}>
                             <div className="hero-actions">
-                                <button className="btn btn-primary btn-large" onClick={() => document.getElementById('product-display-section').scrollIntoView({ behavior: 'smooth' })}>
-                                    Shop Collection
+                                <button
+                                    className="btn btn-primary btn-large"
+                                    onClick={() =>
+                                        document
+                                            .getElementById('product-display-section')
+                                            .scrollIntoView({ behavior: 'smooth' })
+                                    }
+                                >
+                                    Shop Marketplace
                                 </button>
                                 <button className="btn btn-outline btn-large" onClick={handleBrowseCategories}>
-                                    Browse Categories <Filter size={18} />
+                                    Browse Filters <Filter size={18} />
                                 </button>
                             </div>
                         </FadeInSection>
                     </div>
 
-                    {/* Abstract decorative element for the playful/vibrant feel */}
                     <div className="hero-decoration">
                         <div className="blob blob-1"></div>
                         <div className="blob blob-2"></div>
@@ -184,84 +454,285 @@ const HomePage = () => {
                 </section>
             )}
 
-            {/* Featured Products */}
-            <section 
-                id="product-display-section" 
-                className="featured-section container" 
-                style={{ 
+            <section
+                id="product-display-section"
+                className="featured-section container"
+                style={{
                     scrollMarginTop: '100px',
-                    paddingTop: (selectedCategory !== 'Default' || keyword || showCategories) ? '3rem' : '0'
+                    paddingTop: !isLandingView || keyword ? '3rem' : '0',
                 }}
             >
                 <FadeInSection>
                     <div className="section-header">
-                        <h2>
-                            {keyword ? `Results for "${keyword}"`
-                                : selectedCategory === 'Default' ? 'Category Highlights'
-                                    : selectedCategory === 'All' ? 'Everything Quad Tech'
-                                        : `${selectedCategory} Collection`}
-                        </h2>
-                        <p>Take a look at what's new, right now.</p>
+                        <h2>{sectionTitle}</h2>
+                        <p>Browse the full mix of electronics and fashion with safe optional filters.</p>
                     </div>
 
-                    {showCategories && (
-                        <div className="category-filter-container animate-fade-in">
-                            {categories.map(cat => (
+                    <div className="marketplace-filter-panel glass">
+                        <div className="department-pill-row">
+                            {DEPARTMENT_OPTIONS.map((option) => (
                                 <button
-                                    key={cat}
-                                    className={`category-pill ${selectedCategory === cat ? 'active' : ''}`}
-                                    onClick={() => setSelectedCategory(cat)}
+                                    key={option.value}
+                                    className={`department-pill ${filters.department === option.value ? 'active' : ''}`}
+                                    onClick={() => updateFilter('department', option.value)}
                                 >
-                                    {cat}
+                                    {option.label}
                                 </button>
                             ))}
                         </div>
-                    )}
+
+                        <div className="filter-grid">
+                            <label className="filter-field">
+                                <span>Category</span>
+                                <select
+                                    value={filters.category}
+                                    onChange={(event) => updateFilter('category', event.target.value)}
+                                >
+                                    <option value="all">All Categories</option>
+                                    {availableCategories.map((category) => (
+                                        <option key={category} value={category}>
+                                            {category}
+                                        </option>
+                                    ))}
+                                </select>
+                            </label>
+
+                            <label className="filter-field">
+                                <span>Brand</span>
+                                <select
+                                    value={filters.brand}
+                                    onChange={(event) => updateFilter('brand', event.target.value)}
+                                >
+                                    <option value="all">All Brands</option>
+                                    {availableBrands.map((brand) => (
+                                        <option key={brand} value={brand}>
+                                            {brand}
+                                        </option>
+                                    ))}
+                                </select>
+                            </label>
+
+                            <label className="filter-field">
+                                <span>Price</span>
+                                <select
+                                    value={filters.priceRange}
+                                    onChange={(event) => updateFilter('priceRange', event.target.value)}
+                                >
+                                    {PRICE_RANGES.map((priceRange) => (
+                                        <option key={priceRange.value} value={priceRange.value}>
+                                            {priceRange.label}
+                                        </option>
+                                    ))}
+                                </select>
+                            </label>
+                        </div>
+
+                        <div className="category-filter-container animate-fade-in">
+                            <button
+                                className={`category-pill ${filters.category === 'all' ? 'active' : ''}`}
+                                onClick={() => updateFilter('category', 'all')}
+                            >
+                                All Categories
+                            </button>
+                            {availableCategories.map((category) => (
+                                <button
+                                    key={category}
+                                    className={`category-pill ${filters.category === category ? 'active' : ''}`}
+                                    onClick={() => updateFilter('category', category)}
+                                >
+                                    {category}
+                                </button>
+                            ))}
+                        </div>
+
+                        {filters.department === 'fashion' && (
+                            <div className="fashion-filter-grid">
+                                <label className="filter-field">
+                                    <span>Gender</span>
+                                    <select
+                                        value={filters.gender}
+                                        onChange={(event) => updateFilter('gender', event.target.value)}
+                                    >
+                                        <option value="all">All Genders</option>
+                                        {fashionFilterOptions.genders.map((gender) => (
+                                            <option key={gender} value={gender}>
+                                                {gender}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </label>
+
+                                <label className="filter-field">
+                                    <span>Size</span>
+                                    <select
+                                        value={filters.size}
+                                        onChange={(event) => updateFilter('size', event.target.value)}
+                                    >
+                                        <option value="all">All Sizes</option>
+                                        {fashionFilterOptions.sizes.map((size) => (
+                                            <option key={size} value={size}>
+                                                {size}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </label>
+
+                                <label className="filter-field">
+                                    <span>Color</span>
+                                    <select
+                                        value={filters.color}
+                                        onChange={(event) => updateFilter('color', event.target.value)}
+                                    >
+                                        <option value="all">All Colors</option>
+                                        {fashionFilterOptions.colors.map((color) => (
+                                            <option key={color} value={color}>
+                                                {color}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </label>
+
+                                <label className="filter-field">
+                                    <span>Season</span>
+                                    <select
+                                        value={filters.season}
+                                        onChange={(event) => updateFilter('season', event.target.value)}
+                                    >
+                                        <option value="all">All Seasons</option>
+                                        {fashionFilterOptions.seasons.map((season) => (
+                                            <option key={season} value={season}>
+                                                {season}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </label>
+
+                                <label className="filter-field">
+                                    <span>Occasion</span>
+                                    <select
+                                        value={filters.occasion}
+                                        onChange={(event) => updateFilter('occasion', event.target.value)}
+                                    >
+                                        <option value="all">All Occasions</option>
+                                        {fashionFilterOptions.occasions.map((occasion) => (
+                                            <option key={occasion} value={occasion}>
+                                                {occasion}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </label>
+
+                                <label className="filter-field">
+                                    <span>Style Tag</span>
+                                    <select
+                                        value={filters.styleTag}
+                                        onChange={(event) => updateFilter('styleTag', event.target.value)}
+                                    >
+                                        <option value="all">All Style Tags</option>
+                                        {fashionFilterOptions.styleTags.map((styleTag) => (
+                                            <option key={styleTag} value={styleTag}>
+                                                {styleTag}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </label>
+                            </div>
+                        )}
+                    </div>
                 </FadeInSection>
 
                 <div className="products-grid">
                     {displayedProducts.length > 0 ? (
-                        displayedProducts.map((product, index) => (
-                            <FadeInSection key={product._id} delay={0.05 * (index % 10)}>
-                                <Link to={`/product/${product._id}`} className="product-card glass">
-                                    <div className="product-image">
-                                        <img src={product.image} alt={product.name} />
-                                    </div>
-                                    <div className="product-info">
-                                        <span className="brand-label">{product.category}</span>
-                                        <h3 style={{ fontSize: '1rem', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>{product.name}</h3>
-                                        <p className="price">${product.price.toFixed(2)}</p>
-                                    </div>
-                                </Link>
-                            </FadeInSection>
-                        ))
+                        displayedProducts.map((product, index) => {
+                            const fashionMeta = buildFashionMetaLine(product);
+                            const departmentLabel = getDepartmentLabel(product.department);
+                            const stockLabel = getStockStatusLabel(product.countInStock);
+
+                            return (
+                                <FadeInSection key={product._id} delay={0.05 * (index % 10)}>
+                                    <Link to={`/product/${product._id}`} className="product-card glass">
+                                        <div className="product-image">
+                                            <div className="product-badge-stack">
+                                                <span className={`product-badge badge-${product.department}`}>
+                                                    {departmentLabel}
+                                                </span>
+                                                {product.isNewArrival && (
+                                                    <span className="product-badge badge-new">New Arrival</span>
+                                                )}
+                                                {product.isSponsored && (
+                                                    <span className="product-badge badge-sponsored">Sponsored</span>
+                                                )}
+                                                {product.countInStock === 0 && (
+                                                    <span className="product-badge badge-out">Out of Stock</span>
+                                                )}
+                                                {product.countInStock > 0 && product.countInStock <= 5 && (
+                                                    <span className="product-badge badge-low">Low Stock</span>
+                                                )}
+                                            </div>
+                                            <img src={product.image} alt={product.name} />
+                                        </div>
+                                        <div className="product-info">
+                                            <div className="product-topline">
+                                                <span className="brand-label">{product.brand}</span>
+                                                {typeof product.rating === 'number' && (
+                                                    <span className="rating-pill">
+                                                        {product.rating.toFixed(1)} ★
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <h3>{product.name}</h3>
+                                            <p className="product-category-text">{product.category}</p>
+                                            {fashionMeta && (
+                                                <p className="fashion-meta-line">{fashionMeta}</p>
+                                            )}
+                                            <div className="product-card-footer">
+                                                <p className="price">${Number(product.price || 0).toFixed(2)}</p>
+                                                <span
+                                                    className={`stock-pill ${
+                                                        stockLabel === 'Out of Stock'
+                                                            ? 'stock-out'
+                                                            : stockLabel === 'Low Stock'
+                                                                ? 'stock-low'
+                                                                : 'stock-in'
+                                                    }`}
+                                                >
+                                                    {stockLabel}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </Link>
+                                </FadeInSection>
+                            );
+                        })
                     ) : (
-                        <div className="no-results container animate-fade-in" style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '4rem 0' }}>
+                        <div
+                            className="no-results container animate-fade-in"
+                            style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '4rem 0' }}
+                        >
                             <div className="no-results-icon" style={{ marginBottom: '1.5rem', opacity: 0.5 }}>
                                 <Search size={64} />
                             </div>
                             <h2 style={{ fontSize: '2rem', marginBottom: '1rem' }}>No results found</h2>
                             <p style={{ color: 'var(--text-muted)', marginBottom: '2rem' }}>
-                                We couldn't find any items matching "{keyword}". <br />
-                                Try adjusting your search or browsing our categories.
+                                No products matched the current search or filters. Try another department,
+                                category, or fashion attribute.
                             </p>
-                            <button className="btn btn-outline" onClick={() => { setKeyword(''); navigate('/'); }}>
-                                Clear Search
+                            <button className="btn btn-outline" onClick={resetFilters}>
+                                Clear Filters
                             </button>
                         </div>
                     )}
                 </div>
             </section>
 
-            {/* Categories Banner (Only visible on Default home page) */}
-            {selectedCategory === 'Default' && (
+            {isLandingView && (
                 <section className="category-banner container">
                     <FadeInSection>
                         <div className="banner-content glass">
-                            <h2>Luxury, tailored for you.</h2>
-                            <p>Explore our exclusive categories curated for the modern enthusiast.</p>
+                            <h2>From flagship gadgets to everyday fits.</h2>
+                            <p>Use the department and category filters to move between electronics and fashion without leaving the same storefront.</p>
                             <button className="btn btn-secondary" onClick={handleBrowseCategories}>
-                                Browse Categories
+                                Browse Marketplace
                             </button>
                         </div>
                     </FadeInSection>

@@ -9,6 +9,8 @@
     "dev": "nodemon server.js",
     "data:import": "node seeder.js",
     "data:destroy": "node seeder.js -d",
+    "seed:fashion": "node scripts/seedFashionProducts.js",
+    "inspect:products": "node scripts/inspectProducts.js",
     "migrate:feature7": "node migrations/20260420_feature7_order_user_admin.js",
     "bootstrap:superadmin": "node bootstrap/runEnsureSuperAdmin.js",
     "test": "cross-env NODE_ENV=test node --test \"tests/**/*.test.js\""

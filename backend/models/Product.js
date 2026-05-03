@@ -43,9 +43,41 @@ const productSchema = new mongoose.Schema(
             required: true,
             trim: true,
         },
+        department: {
+            type: String,
+            default: 'electronics',
+            trim: true,
+        },
         description: {
             type: String,
             required: true,
+            trim: true,
+        },
+        gender: {
+            type: String,
+            trim: true,
+        },
+        colors: [String],
+        sizes: [String],
+        material: {
+            type: String,
+            trim: true,
+        },
+        fit: {
+            type: String,
+            trim: true,
+        },
+        occasion: {
+            type: String,
+            trim: true,
+        },
+        season: {
+            type: String,
+            trim: true,
+        },
+        styleTags: [String],
+        productType: {
+            type: String,
             trim: true,
         },
         reviews: [reviewSchema],
@@ -78,6 +110,22 @@ const productSchema = new mongoose.Schema(
         isActive: {
             type: Boolean,
             default: true,
+        },
+        isNewArrival: {
+            type: Boolean,
+            default: false,
+        },
+        adminPriorityScore: {
+            type: Number,
+            default: 0,
+        },
+        isSponsored: {
+            type: Boolean,
+            default: false,
+        },
+        sponsoredWeight: {
+            type: Number,
+            default: 0,
         },
     },
     

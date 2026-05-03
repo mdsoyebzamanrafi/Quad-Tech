@@ -1,31 +1,171 @@
 import Product from '../models/Product.js';
 
+const ACTIVE_PRODUCT_FILTER = {
+    $or: [{ isActive: true }, { isActive: { $exists: false } }],
+};
+
+const SEARCHABLE_FIELDS = [
+    'name',
+    'category',
+    'brand',
+    'department',
+    'description',
+    'colors',
+    'sizes',
+    'styleTags',
+    'occasion',
+    'season',
+    'productType',
+];
+
+const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+const buildContainsRegex = (value) => new RegExp(escapeRegex(value.trim()), 'i');
+
+const buildExactRegex = (value) => new RegExp(`^${escapeRegex(value.trim())}$`, 'i');
+
+const normalizeDepartmentLabel = (department) => {
+    if (!department) {
+        return 'electronics';
+    }
+
+    return String(department).trim().toLowerCase();
+};
+
+const buildDepartmentFilter = (department) => {
+    const normalizedDepartment = normalizeDepartmentLabel(department);
+
+    if (normalizedDepartment === 'electronics') {
+        return {
+            $or: [
+                { department: buildExactRegex('electronics') },
+                { department: { $exists: false } },
+                { department: null },
+                { department: '' },
+            ],
+        };
+    }
+
+    return { department: buildExactRegex(normalizedDepartment) };
+};
+
+const buildKeywordConditions = (keyword) => {
+    if (!keyword || !keyword.trim()) {
+        return [];
+    }
+
+    const normalizedKeyword = keyword.trim().toLowerCase();
+    const regex = buildContainsRegex(keyword);
+    const conditions = SEARCHABLE_FIELDS.map((field) => ({ [field]: regex }));
+
+    if ('electronics'.includes(normalizedKeyword) || normalizedKeyword.includes('tech')) {
+        conditions.push({ department: { $exists: false } });
+    }
+
+    return conditions;
+};
+
+const buildProductQueryFilter = (query, { includeActiveOnly = true } = {}) => {
+    const filters = [];
+
+    if (includeActiveOnly) {
+        filters.push(ACTIVE_PRODUCT_FILTER);
+    }
+
+    const keywordConditions = buildKeywordConditions(query.keyword);
+    if (keywordConditions.length) {
+        filters.push({ $or: keywordConditions });
+    }
+
+    if (query.department) {
+        filters.push(buildDepartmentFilter(query.department));
+    }
+
+    if (query.category) {
+        filters.push({ category: buildExactRegex(query.category) });
+    }
+
+    if (query.brand) {
+        filters.push({ brand: buildExactRegex(query.brand) });
+    }
+
+    if (query.gender) {
+        filters.push({ gender: buildExactRegex(query.gender) });
+    }
+
+    if (query.color) {
+        filters.push({ colors: buildExactRegex(query.color) });
+    }
+
+    if (query.size) {
+        filters.push({ sizes: buildExactRegex(query.size) });
+    }
+
+    if (query.season) {
+        filters.push({ season: buildExactRegex(query.season) });
+    }
+
+    if (query.occasion) {
+        filters.push({ occasion: buildExactRegex(query.occasion) });
+    }
+
+    if (query.styleTag) {
+        filters.push({ styleTags: buildExactRegex(query.styleTag) });
+    }
+
+    if (query.productType) {
+        filters.push({ productType: buildContainsRegex(query.productType) });
+    }
+
+    const minPrice = Number(query.minPrice);
+    const maxPrice = Number(query.maxPrice);
+
+    if (Number.isFinite(minPrice) || Number.isFinite(maxPrice)) {
+        const priceFilter = {};
+
+        if (Number.isFinite(minPrice)) {
+            priceFilter.$gte = minPrice;
+        }
+
+        if (Number.isFinite(maxPrice)) {
+            priceFilter.$lte = maxPrice;
+        }
+
+        filters.push({ price: priceFilter });
+    }
+
+    if (!filters.length) {
+        return {};
+    }
+
+    if (filters.length === 1) {
+        return filters[0];
+    }
+
+    return { $and: filters };
+};
+
+const normalizeStringList = (values) =>
+    Array.isArray(values)
+        ? values.filter((value) => typeof value === 'string' && value.trim())
+        : [];
+
+const matchesSuggestionQuery = (value, query) =>
+    typeof value === 'string' && value.toLowerCase().includes(query.toLowerCase());
+
 // @desc    Fetch all products
 // @route   GET /api/products
 // @access  Public
 const getProducts = async (req, res) => {
     try {
-        // Accept an optional limit from the query string, default to 10
         const queryLimit = req.query.limit ? Number(req.query.limit) : 10;
-        const pageSize = queryLimit;
+        const pageSize = Number.isFinite(queryLimit) && queryLimit > 0 ? queryLimit : 10;
         const page = Number(req.query.pageNumber) || 1;
 
-        const keyword = req.query.keyword
-            ? {
-                name: {
-                    $regex: req.query.keyword,
-                    $options: 'i',
-                },
-            }
-            : {};
-
-        const filter = {
-            ...keyword,
-            $or: [{ isActive: true }, { isActive: { $exists: false } }],
-        };
-
+        const filter = buildProductQueryFilter(req.query);
         const count = await Product.countDocuments(filter);
         const products = await Product.find(filter)
+            .sort({ createdAt: -1, _id: -1 })
             .limit(pageSize)
             .skip(pageSize * (page - 1));
 
@@ -42,7 +182,7 @@ const getProductById = async (req, res) => {
     try {
         const product = await Product.findOne({
             _id: req.params.id,
-            $or: [{ isActive: true }, { isActive: { $exists: false } }],
+            ...ACTIVE_PRODUCT_FILTER,
         });
 
         if (product) {
@@ -63,16 +203,7 @@ const getAdminProducts = async (req, res) => {
         const pageSize = Number(req.query.limit) || 10;
         const page = Number(req.query.pageNumber) || 1;
 
-        const keyword = req.query.keyword
-            ? {
-                name: {
-                    $regex: req.query.keyword,
-                    $options: 'i',
-                },
-            }
-            : {};
-
-        const filter = { ...keyword };
+        const filter = buildProductQueryFilter(req.query, { includeActiveOnly: false });
 
         if (req.query.isActive === 'true') {
             filter.isActive = true;
@@ -97,6 +228,7 @@ const getAdminProducts = async (req, res) => {
         const count = await Product.countDocuments(filter);
 
         const products = await Product.find(filter)
+            .sort({ updatedAt: -1, createdAt: -1 })
             .limit(pageSize)
             .skip(pageSize * (page - 1));
 
@@ -128,6 +260,7 @@ const getAdminProductById = async (req, res) => {
         res.status(500).json({ message: error.message });
     }
 };
+
 // @desc    Create new review
 // @route   POST /api/products/:id/reviews
 // @access  Private
@@ -310,28 +443,52 @@ const updateProductStock = async (req, res) => {
 const getProductSuggestions = async (req, res) => {
     try {
         const { q } = req.query;
-        if (!q) return res.json([]);
+        if (!q || !q.trim()) {
+            return res.json([]);
+        }
 
-        const products = await Product.find({
-            $and: [
-                { $or: [{ isActive: true }, { isActive: { $exists: false } }] },
-                {
-                    $or: [
-                        { name: { $regex: q, $options: 'i' } },
-                        { category: { $regex: q, $options: 'i' } }
-                    ]
-                }
-            ]
-        }).select('name category').limit(10);
+        const filter = buildProductQueryFilter({ keyword: q });
+        const products = await Product.find(filter)
+            .select(
+                'name category brand department colors sizes styleTags occasion season productType'
+            )
+            .sort({ createdAt: -1, _id: -1 })
+            .limit(12)
+            .lean();
 
-        // Extract names and categories and deduplicate
         const suggestions = new Set();
-        products.forEach(p => {
-            if (p.name.toLowerCase().includes(q.toLowerCase())) suggestions.add(p.name);
-            if (p.category.toLowerCase().includes(q.toLowerCase())) suggestions.add(p.category);
+
+        if ('electronics'.includes(q.toLowerCase())) {
+            suggestions.add('Electronics');
+        }
+
+        products.forEach((product) => {
+            const department = normalizeDepartmentLabel(product.department);
+            const values = [
+                product.name,
+                product.category,
+                product.brand,
+                department,
+                product.occasion,
+                product.season,
+                product.productType,
+                ...normalizeStringList(product.colors),
+                ...normalizeStringList(product.sizes),
+                ...normalizeStringList(product.styleTags),
+            ];
+
+            values.forEach((value) => {
+                if (matchesSuggestionQuery(value, q)) {
+                    suggestions.add(
+                        department === value
+                            ? department.charAt(0).toUpperCase() + department.slice(1)
+                            : value
+                    );
+                }
+            });
         });
 
-        res.json(Array.from(suggestions).slice(0, 8));
+        res.json(Array.from(suggestions).slice(0, 10));
     } catch (error) {
         res.status(500).json({ message: error.message });
     }
