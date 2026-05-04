@@ -10,6 +10,8 @@ import {
     Menu,
     X,
     ShieldCheck,
+    Heart,
+    Users,
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import api from '../utils/api';
@@ -237,6 +239,17 @@ const Navbar = () => {
                             <User size={20} />
                             <span className="nav-text">Sign In</span>
                         </Link>
+                    )}
+
+                    {userInfo && (
+                        <>
+                            <Link to="/wishlist" className="nav-item" aria-label="Wishlist">
+                                <Heart size={20} />
+                            </Link>
+                            <Link to="/friends" className="nav-item" aria-label="Friends">
+                                <Users size={20} />
+                            </Link>
+                        </>
                     )}
 
                     <Link to="/cart" className="btn btn-primary nav-cart">

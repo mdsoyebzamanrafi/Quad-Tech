@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useInView } from 'react-intersection-observer';
-import { Sparkles, Filter, Search } from 'lucide-react';
+import { Sparkles, Filter, Search, Heart } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import '../styles/HomePage.css';
 import api from '../utils/api';
@@ -62,6 +62,16 @@ const HomePage = () => {
 
     const navigate = useNavigate();
     const location = useLocation();
+
+    const handleAddToWishlist = async (e, productId) => {
+        e.preventDefault();
+        try {
+            await api.post('/api/wishlist', { productId });
+            alert('Added to wishlist!');
+        } catch (error) {
+            alert('Please login to add to wishlist');
+        }
+    };
 
     useEffect(() => {
         const fetchProducts = async () => {
@@ -650,7 +660,14 @@ const HomePage = () => {
 
                             return (
                                 <FadeInSection key={product._id} delay={0.05 * (index % 10)}>
-                                    <Link to={`/product/${product._id}`} className="product-card glass">
+                                    <Link to={`/product/${product._id}`} className="product-card glass" style={{ position: 'relative' }}>
+                                        <button 
+                                            onClick={(e) => handleAddToWishlist(e, product._id)}
+                                            style={{ position: 'absolute', top: '10px', right: '10px', background: 'rgba(255,255,255,0.8)', border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: 10, color: 'var(--accent-1)' }}
+                                            title="Add to wishlist"
+                                        >
+                                            <Heart size={16} />
+                                        </button>
                                         <div className="product-image">
                                             <div className="product-badge-stack">
                                                 <span className={`product-badge badge-${product.department}`}>

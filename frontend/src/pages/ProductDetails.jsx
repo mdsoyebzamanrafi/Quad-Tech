@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { ShoppingCart, ArrowLeft, Star, ShieldCheck, Truck, Ruler, Palette } from 'lucide-react';
+import { ShoppingCart, ArrowLeft, Star, ShieldCheck, Truck, Ruler, Palette, Heart } from 'lucide-react';
 import '../styles/ProductDetails.css';
 import api from '../utils/api';
 import { useCart } from '../context/CartContext';
@@ -39,6 +39,15 @@ const ProductDetails = () => {
     const addToCartHandler = () => {
         addToCart(product._id, qty);
         navigate('/cart');
+    };
+
+    const handleAddToWishlist = async () => {
+        try {
+            await api.post('/api/wishlist', { productId: product._id });
+            alert('Added to wishlist!');
+        } catch (error) {
+            alert('Please login to add to wishlist');
+        }
     };
 
     const normalizedProduct = useMemo(() => {
@@ -233,13 +242,21 @@ const ProductDetails = () => {
                         </div>
                     )}
 
-                    <div className="action-button-wrapper">
+                    <div className="action-button-wrapper" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1rem' }}>
                         <button
                             className="btn btn-primary btn-full"
                             disabled={normalizedProduct.countInStock === 0}
                             onClick={addToCartHandler}
                         >
                             <ShoppingCart size={20} /> Add To Cart
+                        </button>
+                        <button
+                            className="btn btn-secondary btn-full"
+                            style={{ display: 'flex', justifyContent: 'center' }}
+                            onClick={handleAddToWishlist}
+                            title="Add to Wishlist"
+                        >
+                            <Heart size={20} /> Save to Wishlist
                         </button>
                     </div>
                 </div>

@@ -21,7 +21,7 @@ const ShippingPage = () => {
     const submitHandler = (e) => {
         e.preventDefault();
         saveShippingAddress({ address, city, postalCode, country, phone });
-        savePaymentMethod('Placeholder');
+        savePaymentMethod('Cash on Delivery');
         navigate('/placeorder');
     };
 
@@ -113,7 +113,7 @@ const ShippingPage = () => {
                     </div>
 
                     <button type="submit" className="btn btn-primary btn-full login-btn" style={{ marginTop: '2rem' }}>
-                        Continue to Payment
+                        Review Order
                     </button>
                 </form>
             </div>

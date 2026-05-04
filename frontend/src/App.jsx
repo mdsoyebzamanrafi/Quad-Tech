@@ -18,12 +18,17 @@ import OTPVerificationPage from './pages/OTPVerificationPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
 import SetPasswordPage from './pages/SetPasswordPage';
+import FAQPage from './pages/FAQPage';
+import FeedbackPage from './pages/FeedbackPage';
+import WishlistPage from './pages/WishlistPage';
+import FriendsPage from './pages/FriendsPage';
 import AdminRoute from './components/admin/AdminRoute';
 import AdminLayout from './components/admin/AdminLayout';
 import AdminOrdersPage from './pages/admin/AdminOrdersPage';
 import AdminOrderDetailsPage from './pages/admin/AdminOrderDetailsPage';
 import AdminUsersPage from './pages/admin/AdminUsersPage';
 import AdminUserDetailsPage from './pages/admin/AdminUserDetailsPage';
+import AdminFAQPage from './pages/admin/AdminFAQPage';
 import CouponListPage from './pages/admin/CouponListPage';
 import CouponCreatePage from './pages/admin/CouponCreatePage';
 import CouponEditPage from './pages/admin/CouponEditPage';
@@ -63,6 +68,10 @@ function AppContent() {
           <Route path="/order/:id" element={<OrderPage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/orders" element={<OrdersPage />} />
+          <Route path="/faq" element={<FAQPage />} />
+          <Route path="/feedback" element={<FeedbackPage />} />
+          <Route path="/wishlist" element={<WishlistPage />} />
+          <Route path="/friends" element={<FriendsPage />} />
           <Route
             path="/admin"
             element={
@@ -83,6 +92,7 @@ function AppContent() {
             <Route path="sales" element={<SalesDashboardPage />} />
             <Route path="users" element={<AdminUsersPage />} />
             <Route path="users/:id" element={<AdminUserDetailsPage />} />
+            <Route path="faqs" element={<AdminFAQPage />} />
           </Route>
         </Routes>
       </RequirePassword>

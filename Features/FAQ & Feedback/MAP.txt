@@ -1,0 +1,49 @@
+trail-faq-feedback/
+├── backend/
+│   ├── config/
+│   │   └── db.js
+│   ├── middleware/
+│   │   ├── rateLimit.js
+│   │   └── validation.js
+│   ├── models/
+│   │   ├── FAQ.js
+│   │   ├── FAQFeedback.js
+│   │   └── CustomerFeedback.js
+│   ├── routes/
+│   │   ├── faqRoutes.js
+│   │   └── feedbackRoutes.js
+│   ├── utils/
+│   │   └── helpers.js
+│   ├── .env
+│   ├── package.json
+│   ├── seed.js
+│   └── server.js
+│
+└── frontend/
+    ├── public/
+    ├── src/
+    │   ├── components/
+    │   │   ├── FAQAccordion.tsx
+    │   │   ├── FAQSection.tsx
+    │   │   ├── FeedbackForm.tsx
+    │   │   ├── FeedbackList.tsx
+    │   │   ├── RatingStats.tsx
+    │   │   ├── StarRating.tsx
+    │   │   └── Testimonials.tsx
+    │   ├── hooks/
+    │   │   ├── useFAQs.ts
+    │   │   └── useFeedback.ts
+    │   ├── services/
+    │   │   └── api.ts
+    │   ├── types/
+    │   │   └── index.ts
+    │   ├── App.tsx
+    │   ├── index.css
+    │   └── main.tsx
+    ├── .env
+    ├── index.html
+    ├── package.json
+    ├── postcss.config.js
+    ├── tsconfig.json
+    ├── tsconfig.node.json
+    └── vite.config.ts

@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
-import { BarChart3, ClipboardList, LayoutDashboard, Package, ShieldCheck, TicketPercent, Users } from 'lucide-react';
+import { BarChart3, ClipboardList, LayoutDashboard, Package, ShieldCheck, TicketPercent, Users, HelpCircle } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import '../../styles/Admin.css';
 
@@ -38,6 +38,10 @@ const AdminLayout = () => {
                     <NavLink to="/admin/users" className={({ isActive }) => `admin-nav-link ${isActive ? 'active' : ''}`}>
                         <Users size={18} />
                         Users
+                    </NavLink>
+                    <NavLink to="/admin/faqs" className={({ isActive }) => `admin-nav-link ${isActive ? 'active' : ''}`}>
+                        <HelpCircle size={18} />
+                        FAQs
                     </NavLink>
                 </nav>
 

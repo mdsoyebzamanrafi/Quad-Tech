@@ -95,10 +95,8 @@ const PlaceOrderPage = () => {
     useEffect(() => {
         if (!shippingAddress.address) {
             navigate('/shipping');
-        } else if (!paymentMethod) {
-            navigate('/payment');
         }
-    }, [shippingAddress, paymentMethod, navigate]);
+    }, [shippingAddress, navigate]);
 
     const applyCouponHandler = async () => {
         if (!couponInput.trim()) {

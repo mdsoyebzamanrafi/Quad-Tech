@@ -6,6 +6,10 @@ import orderRoutes from './routes/orderRoutes.js';
 import paymentRoutes from './routes/paymentRoutes.js';
 import couponRoutes from './routes/couponRoutes.js';
 import salesRoutes from './routes/salesRoutes.js';
+import faqRoutes from './routes/faqRoutes.js';
+import feedbackRoutes from './routes/feedbackRoutes.js';
+import wishlistRoutes from './routes/wishlistRoutes.js';
+import friendRoutes from './routes/friendRoutes.js';
 import { errorHandler, notFound } from './middleware/errorMiddleware.js';
 
 const app = express();
@@ -23,6 +27,10 @@ app.use('/api/orders', orderRoutes);
 app.use('/api/payment', paymentRoutes);
 app.use('/api/coupons', couponRoutes);
 app.use('/api/sales', salesRoutes);
+app.use('/api/faqs', faqRoutes);
+app.use('/api/feedback', feedbackRoutes);
+app.use('/api/wishlist', wishlistRoutes);
+app.use('/api/friends', friendRoutes);
 
 app.use(notFound);
 app.use(errorHandler);
