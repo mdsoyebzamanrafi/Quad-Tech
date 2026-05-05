@@ -5,6 +5,7 @@ import generateToken from '../utils/generateToken.js';
 import sendEmail from '../utils/sendEmail.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import ApiError from '../errors/ApiError.js';
+import { verifyCaptchaToken } from '../utils/captcha.js';
 import {
     USER_ROLES,
     USER_STATUSES,
@@ -17,41 +18,6 @@ import {
     updateUserRoleBySuperAdmin,
     softDeleteUserByAdmin,
 } from '../services/userAdminService.js';
-
-const verifyRecaptcha = async (token) => {
-    if (process.env.NODE_ENV === 'test') return true;
-
-    const isDevelopmentBypassEnabled = (
-        process.env.NODE_ENV === 'development' &&
-        process.env.DISABLE_RECAPTCHA === 'true'
-    );
-
-    if (isDevelopmentBypassEnabled) {
-        return true;
-    }
-
-    if (!process.env.RECAPTCHA_SECRET_KEY) {
-        throw new ApiError(500, 'reCAPTCHA secret key is not configured');
-    }
-
-    if (!token || typeof token !== 'string') {
-        return false;
-    }
-
-    const response = await fetch('https://www.google.com/recaptcha/api/siteverify', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: new URLSearchParams({
-            secret: process.env.RECAPTCHA_SECRET_KEY,
-            response: token,
-        }),
-    });
-
-    const outcome = await response.json();
-    return outcome.success;
-};
 
 const ensureUserCanAuthenticate = (user) => {
     if (!user) {
@@ -90,7 +56,7 @@ const authUser = asyncHandler(async (req, res) => {
         throw new ApiError(400, 'email and password are required');
     }
 
-    const isHuman = await verifyRecaptcha(captchaToken);
+    const isHuman = await verifyCaptchaToken(captchaToken);
     if (!isHuman) {
         throw new ApiError(400, 'CAPTCHA verification failed. Please try again.');
     }
@@ -117,7 +83,7 @@ const authUser = asyncHandler(async (req, res) => {
 const registerUser = asyncHandler(async (req, res) => {
     const { name, email, password, captchaToken, phone } = req.body;
 
-    const isHuman = await verifyRecaptcha(captchaToken);
+    const isHuman = await verifyCaptchaToken(captchaToken);
     if (!isHuman) {
         throw new ApiError(400, 'CAPTCHA verification failed. Please try again.');
     }
@@ -290,7 +256,7 @@ const forgotPassword = asyncHandler(async (req, res) => {
         throw new ApiError(400, 'email is required');
     }
 
-    const isHuman = await verifyRecaptcha(captchaToken);
+    const isHuman = await verifyCaptchaToken(captchaToken);
     if (!isHuman) {
         throw new ApiError(400, 'CAPTCHA verification failed. Please try again.');
     }

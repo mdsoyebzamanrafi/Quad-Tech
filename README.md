@@ -60,6 +60,10 @@ GOOGLE_CLIENT_SECRET=your_google_oauth_client_secret
 
 # Google reCAPTCHA
 RECAPTCHA_SECRET_KEY=your_recaptcha_secret_key
+
+# Local development only. CAPTCHA bypass is only honored when
+# NODE_ENV is development/dev/local.
+CAPTCHA_ENABLED=true
 ```
 
 Run the backend server:
@@ -82,6 +86,9 @@ VITE_API_URL=
 # Google Project Keys
 VITE_GOOGLE_CLIENT_ID=your_google_oauth_client_id.apps.googleusercontent.com
 VITE_RECAPTCHA_SITE_KEY=your_recaptcha_site_key
+
+# Local development only. Production builds ignore this flag.
+VITE_CAPTCHA_ENABLED=true
 ```
 
 Run the frontend server:

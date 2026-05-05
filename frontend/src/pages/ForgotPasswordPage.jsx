@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Mail, Loader } from 'lucide-react';
 import ReCAPTCHA from 'react-google-recaptcha';
 import api from '../utils/api';
+import { getCaptchaTokenForSubmission, isCaptchaEnabled } from '../utils/captcha';
 import '../styles/LoginPage.css';
 
 const ForgotPasswordPage = () => {
@@ -11,13 +12,12 @@ const ForgotPasswordPage = () => {
     const [successMsg, setSuccessMsg] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [captchaToken, setCaptchaToken] = useState('');
-    const isDevCaptchaDisabled = import.meta.env.DEV && import.meta.env.VITE_DISABLE_RECAPTCHA === 'true';
     
     const navigate = useNavigate();
 
     const submitHandler = async (e) => {
         e.preventDefault();
-        if (!isDevCaptchaDisabled && !captchaToken) {
+        if (isCaptchaEnabled && !captchaToken) {
             setErrorMsg('Please complete the CAPTCHA before requesting a reset code.');
             return;
         }
@@ -25,10 +25,10 @@ const ForgotPasswordPage = () => {
         setIsLoading(true);
         setErrorMsg('');
         try {
-            await api.post('/api/users/forgotpassword', {
-                email,
-                captchaToken: isDevCaptchaDisabled ? 'dev-recaptcha-disabled' : captchaToken,
-            });
+            const captchaTokenForSubmission = getCaptchaTokenForSubmission(captchaToken);
+            await api.post('/api/users/forgotpassword', captchaTokenForSubmission
+                ? { email, captchaToken: captchaTokenForSubmission }
+                : { email });
             setSuccessMsg('OTP Code sent! Redirecting...');
             setErrorMsg('');
             setTimeout(() => {
@@ -68,7 +68,7 @@ const ForgotPasswordPage = () => {
                         </div>
                     </div>
 
-                    {isDevCaptchaDisabled ? (
+                    {!isCaptchaEnabled ? (
                         <div className="dev-captcha-note">
                             CAPTCHA is disabled for local development.
                         </div>
@@ -87,7 +87,7 @@ const ForgotPasswordPage = () => {
                         </div>
                     )}
 
-                    <button type="submit" className="btn btn-primary btn-full" disabled={isLoading || (!isDevCaptchaDisabled && !captchaToken)}>
+                    <button type="submit" className="btn btn-primary btn-full" disabled={isLoading || (isCaptchaEnabled && !captchaToken)}>
                         {isLoading ? <Loader className="spinner" size={20} /> : 'Send Code'}
                     </button>
                 </form>

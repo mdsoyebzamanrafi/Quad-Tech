@@ -20,6 +20,7 @@ import {
 } from '../constants/domainConstants.js';
 
 let replSet;
+const CAPTCHA_ENV_KEYS = ['NODE_ENV', 'CAPTCHA_ENABLED', 'DISABLE_RECAPTCHA', 'RECAPTCHA_SECRET_KEY'];
 
 const authHeaderFor = (userId) => ({
     Authorization: `Bearer ${jwt.sign({ userId: String(userId) }, process.env.JWT_SECRET)}`,
@@ -114,6 +115,36 @@ const createOrderWithSingleItem = async ({
     });
 
     return order;
+};
+
+const withCaptchaEnv = async (overrides, callback) => {
+    const previous = Object.fromEntries(CAPTCHA_ENV_KEYS.map((key) => [key, process.env[key]]));
+
+    for (const key of CAPTCHA_ENV_KEYS) {
+        if (!(key in overrides)) {
+            continue;
+        }
+
+        if (overrides[key] === undefined) {
+            delete process.env[key];
+            continue;
+        }
+
+        process.env[key] = overrides[key];
+    }
+
+    try {
+        return await callback();
+    } finally {
+        for (const key of CAPTCHA_ENV_KEYS) {
+            if (previous[key] === undefined) {
+                delete process.env[key];
+                continue;
+            }
+
+            process.env[key] = previous[key];
+        }
+    }
 };
 
 before(async () => {
@@ -467,6 +498,110 @@ test('blocked/deleted users cannot authenticate or access protected routes', asy
         .set(authHeaderFor(deleted._id));
 
     assert.equal(protectedRes.status, 403);
+});
+
+test('local development login bypasses captcha without calling the provider', async () => {
+    const user = await createUser({ email: uniqueEmail('local-captcha') });
+    const originalFetch = global.fetch;
+    let fetchCalled = false;
+
+    global.fetch = async () => {
+        fetchCalled = true;
+        throw new Error('captcha provider should not be called when disabled');
+    };
+
+    try {
+        const loginRes = await withCaptchaEnv(
+            {
+                NODE_ENV: 'development',
+                CAPTCHA_ENABLED: 'false',
+                DISABLE_RECAPTCHA: undefined,
+                RECAPTCHA_SECRET_KEY: undefined,
+            },
+            () => request(app)
+                .post('/api/users/login')
+                .send({
+                    email: user.email,
+                    password: 'password123',
+                })
+        );
+
+        assert.equal(loginRes.status, 200);
+        assert.equal(fetchCalled, false);
+    } finally {
+        global.fetch = originalFetch;
+    }
+});
+
+test('production-like environments ignore disable flags and still require a captcha token', async () => {
+    const user = await createUser({ email: uniqueEmail('staging-captcha') });
+    const originalFetch = global.fetch;
+    let fetchCalled = false;
+
+    global.fetch = async () => {
+        fetchCalled = true;
+        throw new Error('captcha provider should not be called when token is missing');
+    };
+
+    try {
+        const loginRes = await withCaptchaEnv(
+            {
+                NODE_ENV: 'staging',
+                CAPTCHA_ENABLED: 'false',
+                DISABLE_RECAPTCHA: 'true',
+                RECAPTCHA_SECRET_KEY: 'staging-secret',
+            },
+            () => request(app)
+                .post('/api/users/login')
+                .send({
+                    email: user.email,
+                    password: 'password123',
+                })
+        );
+
+        assert.equal(loginRes.status, 400);
+        assert.equal(loginRes.body.message, 'CAPTCHA verification failed. Please try again.');
+        assert.equal(fetchCalled, false);
+    } finally {
+        global.fetch = originalFetch;
+    }
+});
+
+test('production login returns the provider failure message when verification fails', async () => {
+    const user = await createUser({ email: uniqueEmail('provider-captcha') });
+    const originalFetch = global.fetch;
+    let fetchCalled = false;
+
+    global.fetch = async () => {
+        fetchCalled = true;
+        return {
+            json: async () => ({ success: false }),
+        };
+    };
+
+    try {
+        const loginRes = await withCaptchaEnv(
+            {
+                NODE_ENV: 'production',
+                CAPTCHA_ENABLED: undefined,
+                DISABLE_RECAPTCHA: undefined,
+                RECAPTCHA_SECRET_KEY: 'prod-secret',
+            },
+            () => request(app)
+                .post('/api/users/login')
+                .send({
+                    email: user.email,
+                    password: 'password123',
+                    captchaToken: 'invalid-prod-token',
+                })
+        );
+
+        assert.equal(loginRes.status, 400);
+        assert.equal(loginRes.body.message, 'CAPTCHA verification failed. Please try again.');
+        assert.equal(fetchCalled, true);
+    } finally {
+        global.fetch = originalFetch;
+    }
 });
 
 test('last super admin cannot be demoted, blocked, deleted, or changed to non-super-admin', async () => {

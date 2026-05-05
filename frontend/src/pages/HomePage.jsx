@@ -5,6 +5,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import '../styles/HomePage.css';
 import api from '../utils/api';
 import { DEPARTMENT_OPTIONS } from '../utils/catalog';
+import RecommendedForYou from '../components/RecommendedForYou';
 import {
     buildFashionMetaLine,
     getDepartmentLabel,
@@ -463,6 +464,12 @@ const HomePage = () => {
                     </div>
                 </section>
             )}
+
+            <section className="container">
+                <FadeInSection>
+                    <RecommendedForYou />
+                </FadeInSection>
+            </section>
 
             <section
                 id="product-display-section"

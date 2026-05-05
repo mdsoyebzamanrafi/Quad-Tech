@@ -4,6 +4,7 @@ import { Mail, Lock, Loader } from 'lucide-react';
 import { useGoogleLogin } from '@react-oauth/google';
 import ReCAPTCHA from 'react-google-recaptcha';
 import { useAuth } from '../context/AuthContext';
+import { getCaptchaTokenForSubmission, isCaptchaEnabled } from '../utils/captcha';
 import '../styles/LoginPage.css';
 
 const LoginPage = () => {
@@ -12,7 +13,6 @@ const LoginPage = () => {
     const [errorMsg, setErrorMsg] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [captchaToken, setCaptchaToken] = useState('');
-    const isDevCaptchaDisabled = import.meta.env.DEV && import.meta.env.VITE_DISABLE_RECAPTCHA === 'true';
 
     const { login, googleLogin, userInfo } = useAuth();
     const navigate = useNavigate();
@@ -28,7 +28,7 @@ const LoginPage = () => {
 
     const submitHandler = async (e) => {
         e.preventDefault();
-        if (!isDevCaptchaDisabled && !captchaToken) {
+        if (isCaptchaEnabled && !captchaToken) {
             setErrorMsg('Please complete the CAPTCHA before signing in.');
             return;
         }
@@ -36,7 +36,7 @@ const LoginPage = () => {
         setIsLoading(true);
         setErrorMsg('');
         try {
-            await login(email, password, isDevCaptchaDisabled ? 'dev-recaptcha-disabled' : captchaToken);
+            await login(email, password, getCaptchaTokenForSubmission(captchaToken));
         } catch (err) {
             setErrorMsg(err);
         } finally {
@@ -115,7 +115,7 @@ const LoginPage = () => {
                         </div>
                     </div>
 
-                    {isDevCaptchaDisabled ? (
+                    {!isCaptchaEnabled ? (
                         <div className="dev-captcha-note">
                             CAPTCHA is disabled for local development.
                         </div>
@@ -134,7 +134,7 @@ const LoginPage = () => {
                         </div>
                     )}
 
-                    <button type="submit" className="btn btn-primary btn-full" disabled={isLoading || (!isDevCaptchaDisabled && !captchaToken)}>
+                    <button type="submit" className="btn btn-primary btn-full" disabled={isLoading || (isCaptchaEnabled && !captchaToken)}>
                         {isLoading ? <Loader className="spinner" size={20} /> : 'Sign In'}
                     </button>
                     

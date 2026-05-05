@@ -4,6 +4,7 @@ import { Mail, Lock, User, Loader } from 'lucide-react';
 import { useGoogleLogin } from '@react-oauth/google';
 import ReCAPTCHA from 'react-google-recaptcha';
 import { useAuth } from '../context/AuthContext';
+import { getCaptchaTokenForSubmission, isCaptchaEnabled } from '../utils/captcha';
 import '../styles/LoginPage.css';
 
 const RegisterPage = () => {
@@ -14,7 +15,6 @@ const RegisterPage = () => {
     const [errorMsg, setErrorMsg] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [captchaToken, setCaptchaToken] = useState('');
-    const isDevCaptchaDisabled = import.meta.env.DEV && import.meta.env.VITE_DISABLE_RECAPTCHA === 'true';
 
     const { register, googleLogin, userInfo } = useAuth();
     const navigate = useNavigate();
@@ -34,7 +34,7 @@ const RegisterPage = () => {
             setErrorMsg('Passwords do not match');
             return;
         }
-        if (!isDevCaptchaDisabled && !captchaToken) {
+        if (isCaptchaEnabled && !captchaToken) {
             setErrorMsg('Please complete the CAPTCHA before creating your account.');
             return;
         }
@@ -42,7 +42,7 @@ const RegisterPage = () => {
         setIsLoading(true);
         setErrorMsg('');
         try {
-            const res = await register(name, email, password, isDevCaptchaDisabled ? 'dev-recaptcha-disabled' : captchaToken);
+            const res = await register(name, email, password, getCaptchaTokenForSubmission(captchaToken));
             if (res && res.status === 'pending_verification') {
                 navigate('/verify', { state: { email } });
                 return;
@@ -154,7 +154,7 @@ const RegisterPage = () => {
                         </div>
                     </div>
 
-                    {isDevCaptchaDisabled ? (
+                    {!isCaptchaEnabled ? (
                         <div className="dev-captcha-note">
                             CAPTCHA is disabled for local development.
                         </div>
@@ -173,7 +173,7 @@ const RegisterPage = () => {
                         </div>
                     )}
 
-                    <button type="submit" className="btn btn-primary btn-full login-btn" disabled={isLoading || (!isDevCaptchaDisabled && !captchaToken)}>
+                    <button type="submit" className="btn btn-primary btn-full login-btn" disabled={isLoading || (isCaptchaEnabled && !captchaToken)}>
                         {isLoading ? <Loader className="spinner" size={20} /> : 'Create Account'}
                     </button>
 

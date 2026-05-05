@@ -3,6 +3,10 @@ import api from '../utils/api';
 
 const AuthContext = createContext();
 
+const withCaptchaToken = (payload, captchaToken) => (
+    captchaToken ? { ...payload, captchaToken } : payload
+);
+
 export const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider = ({ children }) => {
@@ -20,7 +24,7 @@ export const AuthProvider = ({ children }) => {
 
     const login = async (email, password, captchaToken) => {
         try {
-            const { data } = await api.post('/api/users/login', { email, password, captchaToken });
+            const { data } = await api.post('/api/users/login', withCaptchaToken({ email, password }, captchaToken));
             setUserInfo(data);
             localStorage.setItem('userInfo', JSON.stringify(data));
             return data;
@@ -42,7 +46,7 @@ export const AuthProvider = ({ children }) => {
 
     const register = async (name, email, password, captchaToken) => {
         try {
-            const { data } = await api.post('/api/users', { name, email, password, captchaToken });
+            const { data } = await api.post('/api/users', withCaptchaToken({ name, email, password }, captchaToken));
             if (data.status === 'pending_verification') {
                 return data;
             }

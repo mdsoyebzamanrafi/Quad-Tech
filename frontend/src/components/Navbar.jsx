@@ -12,6 +12,7 @@ import {
     ShieldCheck,
     Heart,
     Users,
+    Sparkles,
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import api from '../utils/api';
@@ -243,6 +244,10 @@ const Navbar = () => {
 
                     {userInfo && (
                         <>
+                            <Link to="/recommendations" className="nav-item" aria-label="Recommended">
+                                <Sparkles size={20} />
+                                <span className="nav-text">For You</span>
+                            </Link>
                             <Link to="/wishlist" className="nav-item" aria-label="Wishlist">
                                 <Heart size={20} />
                             </Link>
