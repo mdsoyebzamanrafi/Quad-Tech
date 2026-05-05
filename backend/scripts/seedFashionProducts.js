@@ -3,13 +3,14 @@ import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import mongoose from 'mongoose';
 import Product from '../models/Product.js';
-import User from '../models/User.js';
 import fashionProducts from '../data/fashionProducts.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
+
+const SEED_USER_ID = new mongoose.Types.ObjectId('69d780aa455e258b2e724fbf');
 
 const buildDepartmentMatch = (department) => {
     if (department === 'electronics') {
@@ -58,41 +59,29 @@ const seedFashionProducts = async () => {
     console.log('Fashion seed started.');
     console.log(`Fashion products in seed file: ${fashionProducts.length}`);
 
-    const owner = await User.findOne().sort({ createdAt: 1 }).select('_id name email').lean();
-
-    if (!owner) {
-        throw new Error('No users found. Create at least one user before seeding fashion products.');
-    }
-
-    const duplicateConditions = fashionProducts.map((product) => ({
-        name: product.name,
-        brand: product.brand,
-        category: product.category,
+    const bulkOperations = fashionProducts.map((product) => ({
+        updateOne: {
+            filter: {
+                name: product.name,
+                category: product.category,
+            },
+            update: {
+                $set: {
+                    ...product,
+                    user: SEED_USER_ID,
+                    image: product.image,
+                    images: Array.isArray(product.images) && product.images.length ? product.images : [product.image],
+                    rating: 0,
+                    numReviews: 0,
+                    reviews: [],
+                    isActive: true,
+                },
+            },
+            upsert: true,
+        },
     }));
 
-    const existingProducts = await Product.find({ $or: duplicateConditions })
-        .select('name brand category')
-        .lean();
-
-    const existingKeys = new Set(
-        existingProducts.map((product) => `${product.name}::${product.brand}::${product.category}`)
-    );
-
-    const productsToInsert = fashionProducts
-        .filter((product) => !existingKeys.has(`${product.name}::${product.brand}::${product.category}`))
-        .map((product) => ({
-            ...product,
-            user: owner._id,
-        }));
-
-    let insertedCount = 0;
-
-    if (productsToInsert.length > 0) {
-        const insertedProducts = await Product.insertMany(productsToInsert, { ordered: false });
-        insertedCount = insertedProducts.length;
-    }
-
-    const skippedCount = fashionProducts.length - insertedCount;
+    const writeResult = await Product.bulkWrite(bulkOperations, { ordered: false });
 
     const [finalTotalCount, finalFashionCount, finalElectronicsCount] = await Promise.all([
         Product.countDocuments(),
@@ -100,9 +89,10 @@ const seedFashionProducts = async () => {
         Product.countDocuments(buildDepartmentMatch('electronics')),
     ]);
 
-    console.log(`Seed owner: ${owner.name || owner.email || owner._id}`);
-    console.log(`Inserted fashion products: ${insertedCount}`);
-    console.log(`Skipped duplicates: ${skippedCount}`);
+    console.log(`Seed user id: ${SEED_USER_ID}`);
+    console.log(`Upserted fashion products: ${writeResult.upsertedCount || 0}`);
+    console.log(`Modified fashion products: ${writeResult.modifiedCount || 0}`);
+    console.log(`Matched fashion products: ${writeResult.matchedCount || 0}`);
     console.log(`Final total product count: ${finalTotalCount}`);
     console.log(`Final fashion product count: ${finalFashionCount}`);
     console.log(`Final electronics product count: ${finalElectronicsCount}`);

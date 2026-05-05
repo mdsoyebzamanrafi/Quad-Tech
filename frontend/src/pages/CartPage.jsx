@@ -5,6 +5,7 @@ import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import api from '../utils/api';
 import '../styles/CartPage.css';
+import { getProductOptionSummary } from '../utils/productUtils';
 
 const CartPage = () => {
     const {
@@ -126,7 +127,7 @@ const CartPage = () => {
                     <div className="cart-grid">
                         <div className="cart-items-column">
                             {cartItems.map((item) => (
-                                <div key={item.product} className="cart-item glass">
+                                <div key={item.cartItemKey || item.product} className="cart-item glass">
                                     <div className="cart-item-image">
                                         <img src={item.image} alt={item.name} />
                                     </div>
@@ -135,6 +136,9 @@ const CartPage = () => {
                                         <Link to={`/product/${item.product}`} className="cart-item-name">
                                             {item.name}
                                         </Link>
+                                        {getProductOptionSummary(item) && (
+                                            <div className="cart-item-price">{getProductOptionSummary(item)}</div>
+                                        )}
                                         <div className="cart-item-price">${item.price.toFixed(2)}</div>
                                     </div>
 
@@ -142,7 +146,12 @@ const CartPage = () => {
                                         <div className="custom-select-wrapper slim-select">
                                             <select
                                                 value={item.qty}
-                                                onChange={(e) => addToCart(item.product, Number(e.target.value))}
+                                                onChange={(e) =>
+                                                    addToCart(item.product, Number(e.target.value), {
+                                                        selectedColor: item.selectedColor,
+                                                        selectedSize: item.selectedSize,
+                                                    })
+                                                }
                                                 className="qty-select"
                                             >
                                                 {[...Array(item.countInStock).keys()].map((x) => (
@@ -155,7 +164,7 @@ const CartPage = () => {
 
                                         <button
                                             className="remove-btn"
-                                            onClick={() => removeFromCartHandler(item.product)}
+                                            onClick={() => removeFromCartHandler(item.cartItemKey || item.product)}
                                             aria-label="Remove item"
                                         >
                                             <X size={20} />

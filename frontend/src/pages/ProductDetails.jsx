@@ -7,6 +7,7 @@ import { useCart } from '../context/CartContext';
 import {
     buildFashionMetaLine,
     getDepartmentLabel,
+    getProductImages,
     normalizeDepartment,
     normalizeStringList,
 } from '../utils/productUtils';
@@ -18,6 +19,9 @@ const ProductDetails = () => {
     const [product, setProduct] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [activeImage, setActiveImage] = useState('');
+    const [selectedColor, setSelectedColor] = useState('');
+    const [selectedSize, setSelectedSize] = useState('');
 
     const { addToCart } = useCart();
 
@@ -36,20 +40,6 @@ const ProductDetails = () => {
         fetchProduct();
     }, [id]);
 
-    const addToCartHandler = () => {
-        addToCart(product._id, qty);
-        navigate('/cart');
-    };
-
-    const handleAddToWishlist = async () => {
-        try {
-            await api.post('/api/wishlist', { productId: product._id });
-            alert('Added to wishlist!');
-        } catch (error) {
-            alert('Please login to add to wishlist');
-        }
-    };
-
     const normalizedProduct = useMemo(() => {
         if (!product) {
             return null;
@@ -61,8 +51,37 @@ const ProductDetails = () => {
             colors: normalizeStringList(product.colors),
             sizes: normalizeStringList(product.sizes),
             styleTags: normalizeStringList(product.styleTags),
+            images: getProductImages(product),
         };
     }, [product]);
+
+    useEffect(() => {
+        if (!normalizedProduct) {
+            return;
+        }
+
+        setActiveImage(normalizedProduct.images[0] || normalizedProduct.image || '');
+        setSelectedColor(normalizedProduct.colors[0] || '');
+        setSelectedSize(normalizedProduct.sizes[0] || '');
+        setQty(1);
+    }, [normalizedProduct]);
+
+    const addToCartHandler = () => {
+        addToCart(product._id, qty, {
+            selectedColor,
+            selectedSize,
+        });
+        navigate('/cart');
+    };
+
+    const handleAddToWishlist = async () => {
+        try {
+            await api.post('/api/wishlist', { productId: product._id });
+            alert('Added to wishlist!');
+        } catch (wishlistError) {
+            alert('Please login to add to wishlist');
+        }
+    };
 
     const productHighlights = useMemo(() => {
         if (!normalizedProduct) {
@@ -133,9 +152,26 @@ const ProductDetails = () => {
             </Link>
 
             <div className="product-details-grid">
-                <div className="product-image-box">
-                    <div className="image-blob-bg"></div>
-                    <img src={normalizedProduct.image} alt={normalizedProduct.name} />
+                <div className="product-gallery-column">
+                    <div className="product-image-box">
+                        <div className="image-blob-bg"></div>
+                        <img src={activeImage || normalizedProduct.image} alt={normalizedProduct.name} />
+                    </div>
+
+                    {normalizedProduct.images.length > 1 && (
+                        <div className="product-thumbnail-row">
+                            {normalizedProduct.images.map((imageUrl) => (
+                                <button
+                                    key={imageUrl}
+                                    type="button"
+                                    className={`product-thumbnail-button ${activeImage === imageUrl ? 'active' : ''}`}
+                                    onClick={() => setActiveImage(imageUrl)}
+                                >
+                                    <img src={imageUrl} alt={`${normalizedProduct.name} thumbnail`} />
+                                </button>
+                            ))}
+                        </div>
+                    )}
                 </div>
 
                 <div className="product-info-box">
@@ -222,6 +258,42 @@ const ProductDetails = () => {
                             {normalizedProduct.countInStock > 0 ? 'In Stock' : 'Out of Stock'}
                         </strong>
                     </div>
+
+                    {normalizedProduct.colors.length > 0 && (
+                        <div className="product-option-group">
+                            <span className="product-option-label">Color</span>
+                            <div className="product-option-list">
+                                {normalizedProduct.colors.map((color) => (
+                                    <button
+                                        key={color}
+                                        type="button"
+                                        className={`product-option-chip ${selectedColor === color ? 'active' : ''}`}
+                                        onClick={() => setSelectedColor(color)}
+                                    >
+                                        {color}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {normalizedProduct.sizes.length > 0 && (
+                        <div className="product-option-group">
+                            <span className="product-option-label">Size</span>
+                            <div className="product-option-list">
+                                {normalizedProduct.sizes.map((size) => (
+                                    <button
+                                        key={size}
+                                        type="button"
+                                        className={`product-option-chip ${selectedSize === size ? 'active' : ''}`}
+                                        onClick={() => setSelectedSize(size)}
+                                    >
+                                        {size}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
 
                     {normalizedProduct.countInStock > 0 && (
                         <div className="action-row">

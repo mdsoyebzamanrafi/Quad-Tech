@@ -19,6 +19,31 @@ export const normalizeStringList = (values) =>
             .filter(Boolean)
         : [];
 
+export const getProductImages = (product) => {
+    const mainImage = typeof product?.image === 'string' ? product.image.trim() : '';
+    const gallery = normalizeStringList(product?.images);
+    const fallbackGallery = gallery.length ? [mainImage, ...gallery] : [mainImage];
+
+    return Array.from(new Set(fallbackGallery.filter(Boolean)));
+};
+
+export const buildCartItemKey = (productId, selectedColor = '', selectedSize = '') =>
+    [productId, selectedColor.trim(), selectedSize.trim()].join('::');
+
+export const getProductOptionSummary = (item) => {
+    const parts = [];
+
+    if (typeof item?.selectedColor === 'string' && item.selectedColor.trim()) {
+        parts.push(`Color: ${item.selectedColor.trim()}`);
+    }
+
+    if (typeof item?.selectedSize === 'string' && item.selectedSize.trim()) {
+        parts.push(`Size: ${item.selectedSize.trim()}`);
+    }
+
+    return parts.join(' | ');
+};
+
 export const matchesProductKeyword = (product, keyword) => {
     const query = String(keyword || '').trim().toLowerCase();
 
@@ -65,7 +90,7 @@ export const buildFashionMetaLine = (product) => {
         .filter((value, index, array) => array.indexOf(value) === index)
         .slice(0, 3);
 
-    return metaParts.join(' • ');
+    return metaParts.join(' | ');
 };
 
 export const getStockStatusLabel = (countInStock) => {

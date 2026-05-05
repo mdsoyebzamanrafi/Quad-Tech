@@ -150,6 +150,87 @@ const normalizeStringList = (values) =>
         ? values.filter((value) => typeof value === 'string' && value.trim())
         : [];
 
+const normalizeArrayInput = (values) => {
+    if (Array.isArray(values)) {
+        return values
+            .filter((value) => typeof value === 'string')
+            .map((value) => value.trim())
+            .filter(Boolean);
+    }
+
+    if (typeof values === 'string') {
+        return values
+            .split(/[\n,]/)
+            .map((value) => value.trim())
+            .filter(Boolean);
+    }
+
+    return [];
+};
+
+const buildProductMedia = ({ image, images }) => {
+    const mainImage = typeof image === 'string' ? image.trim() : '';
+    const gallery = normalizeArrayInput(images);
+    const dedupedImages = Array.from(new Set([mainImage, ...gallery].filter(Boolean)));
+
+    return {
+        image: mainImage || dedupedImages[0] || '',
+        images: dedupedImages,
+    };
+};
+
+const buildProductUpdatePayload = (payload) => {
+    const productMedia = buildProductMedia(payload);
+    const hasField = (field) => Object.prototype.hasOwnProperty.call(payload, field);
+
+    return {
+        name: hasField('name') && typeof payload.name === 'string' ? payload.name.trim() : payload.name,
+        price: hasField('price') ? payload.price : undefined,
+        image: hasField('image') || hasField('images') ? productMedia.image : undefined,
+        images: hasField('image') || hasField('images') ? productMedia.images : undefined,
+        brand: hasField('brand') && typeof payload.brand === 'string' ? payload.brand.trim() : payload.brand,
+        category:
+            hasField('category') && typeof payload.category === 'string'
+                ? payload.category.trim()
+                : payload.category,
+        department:
+            hasField('department') && typeof payload.department === 'string'
+                ? payload.department.trim()
+                : payload.department,
+        description:
+            hasField('description') && typeof payload.description === 'string'
+                ? payload.description.trim()
+                : payload.description,
+        gender: hasField('gender') && typeof payload.gender === 'string' ? payload.gender.trim() : payload.gender,
+        colors: hasField('colors') ? normalizeArrayInput(payload.colors) : undefined,
+        sizes: hasField('sizes') ? normalizeArrayInput(payload.sizes) : undefined,
+        material:
+            hasField('material') && typeof payload.material === 'string'
+                ? payload.material.trim()
+                : payload.material,
+        fit: hasField('fit') && typeof payload.fit === 'string' ? payload.fit.trim() : payload.fit,
+        occasion:
+            hasField('occasion') && typeof payload.occasion === 'string'
+                ? payload.occasion.trim()
+                : payload.occasion,
+        season:
+            hasField('season') && typeof payload.season === 'string'
+                ? payload.season.trim()
+                : payload.season,
+        styleTags: hasField('styleTags') ? normalizeArrayInput(payload.styleTags) : undefined,
+        productType:
+            hasField('productType') && typeof payload.productType === 'string'
+                ? payload.productType.trim()
+                : payload.productType,
+        countInStock: hasField('countInStock') ? payload.countInStock : undefined,
+        isActive: hasField('isActive') ? payload.isActive : undefined,
+        isNewArrival: hasField('isNewArrival') ? payload.isNewArrival : undefined,
+        adminPriorityScore: hasField('adminPriorityScore') ? payload.adminPriorityScore : undefined,
+        isSponsored: hasField('isSponsored') ? payload.isSponsored : undefined,
+        sponsoredWeight: hasField('sponsoredWeight') ? payload.sponsoredWeight : undefined,
+    };
+};
+
 const matchesSuggestionQuery = (value, query) =>
     typeof value === 'string' && value.toLowerCase().includes(query.toLowerCase());
 
@@ -309,16 +390,32 @@ const createProductReview = async (req, res) => {
 // @access  Private/Admin
 const createProduct = async (req, res) => {
     try {
+        const payload = buildProductUpdatePayload(req.body);
         const {
             name,
             price,
             image,
+            images,
             brand,
             category,
+            department,
             countInStock,
             description,
+            gender,
+            colors,
+            sizes,
+            material,
+            fit,
+            occasion,
+            season,
+            styleTags,
+            productType,
             isActive,
-        } = req.body;
+            isNewArrival,
+            adminPriorityScore,
+            isSponsored,
+            sponsoredWeight,
+        } = payload;
 
         if (!name || !image || !brand || !category || !description) {
             return res.status(400).json({
@@ -331,12 +428,27 @@ const createProduct = async (req, res) => {
             price,
             user: req.user._id,
             image,
+            images,
             brand,
             category,
+            department,
             countInStock,
             numReviews: 0,
             description,
+            gender,
+            colors,
+            sizes,
+            material,
+            fit,
+            occasion,
+            season,
+            styleTags,
+            productType,
             isActive: isActive ?? true,
+            isNewArrival: Boolean(isNewArrival),
+            adminPriorityScore: Number(adminPriorityScore) || 0,
+            isSponsored: Boolean(isSponsored),
+            sponsoredWeight: Number(sponsoredWeight) || 0,
         });
 
         const createdProduct = await product.save();
@@ -354,14 +466,31 @@ const updateProduct = async (req, res) => {
             return res.status(404).json({ message: 'Product not found' });
         }
 
-        product.name = req.body.name ?? product.name;
-        product.price = req.body.price ?? product.price;
-        product.image = req.body.image ?? product.image;
-        product.brand = req.body.brand ?? product.brand;
-        product.category = req.body.category ?? product.category;
-        product.countInStock = req.body.countInStock ?? product.countInStock;
-        product.description = req.body.description ?? product.description;
-        product.isActive = req.body.isActive ?? product.isActive;
+        const payload = buildProductUpdatePayload(req.body);
+
+        product.name = payload.name ?? product.name;
+        product.price = payload.price ?? product.price;
+        product.image = payload.image || product.image;
+        product.images = payload.images ?? product.images;
+        product.brand = payload.brand ?? product.brand;
+        product.category = payload.category ?? product.category;
+        product.department = payload.department ?? product.department;
+        product.countInStock = payload.countInStock ?? product.countInStock;
+        product.description = payload.description ?? product.description;
+        product.gender = payload.gender ?? product.gender;
+        product.colors = payload.colors ?? product.colors;
+        product.sizes = payload.sizes ?? product.sizes;
+        product.material = payload.material ?? product.material;
+        product.fit = payload.fit ?? product.fit;
+        product.occasion = payload.occasion ?? product.occasion;
+        product.season = payload.season ?? product.season;
+        product.styleTags = payload.styleTags ?? product.styleTags;
+        product.productType = payload.productType ?? product.productType;
+        product.isActive = payload.isActive ?? product.isActive;
+        product.isNewArrival = payload.isNewArrival ?? product.isNewArrival;
+        product.adminPriorityScore = payload.adminPriorityScore ?? product.adminPriorityScore;
+        product.isSponsored = payload.isSponsored ?? product.isSponsored;
+        product.sponsoredWeight = payload.sponsoredWeight ?? product.sponsoredWeight;
 
         const updatedProduct = await product.save();
 

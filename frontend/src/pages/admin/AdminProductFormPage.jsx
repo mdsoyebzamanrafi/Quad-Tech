@@ -4,12 +4,21 @@ import { ArrowLeft, Save } from 'lucide-react';
 import api from '../../utils/api';
 import { getErrorMessage } from '../../utils/adminUtils';
 
+const parseListInput = (value) =>
+    String(value || '')
+        .split(/[\n,]/)
+        .map((entry) => entry.trim())
+        .filter(Boolean);
+
 const createEmptyForm = () => ({
     name: '',
     image: '',
+    images: '',
     brand: '',
     category: '',
     description: '',
+    colors: '',
+    sizes: '',
     price: '0',
     countInStock: '0',
     isActive: true,
@@ -18,9 +27,12 @@ const createEmptyForm = () => ({
 const toFormState = (product) => ({
     name: product?.name || '',
     image: product?.image || '',
+    images: Array.isArray(product?.images) ? product.images.join('\n') : '',
     brand: product?.brand || '',
     category: product?.category || '',
     description: product?.description || '',
+    colors: Array.isArray(product?.colors) ? product.colors.join('\n') : '',
+    sizes: Array.isArray(product?.sizes) ? product.sizes.join('\n') : '',
     price: String(product?.price ?? 0),
     countInStock: String(product?.countInStock ?? 0),
     isActive: product?.isActive !== false,
@@ -81,9 +93,12 @@ const AdminProductFormPage = () => {
     const payload = useMemo(() => ({
         name: form.name.trim(),
         image: form.image.trim(),
+        images: parseListInput(form.images),
         brand: form.brand.trim(),
         category: form.category.trim(),
         description: form.description.trim(),
+        colors: parseListInput(form.colors),
+        sizes: parseListInput(form.sizes),
         price: Number(form.price),
         countInStock: Number(form.countInStock),
         isActive: Boolean(form.isActive),
@@ -151,7 +166,7 @@ const AdminProductFormPage = () => {
                         Products
                     </Link>
                     <h1>{isCreateMode ? 'Create Product' : 'Edit Product'}</h1>
-                    <p>{isCreateMode ? 'Add a new product to the catalog.' : 'Update product details, stock, and visibility.'}</p>
+                    <p>{isCreateMode ? 'Add a new product to the catalog.' : 'Update product details, stock, visibility, and gallery data.'}</p>
                 </div>
             </div>
 
@@ -173,7 +188,7 @@ const AdminProductFormPage = () => {
                         <input id="category" name="category" className="admin-input" value={form.category} onChange={changeHandler} required />
                     </div>
                     <div className="admin-field">
-                        <label htmlFor="image">Image</label>
+                        <label htmlFor="image">Main Image URL</label>
                         <input id="image" name="image" className="admin-input" value={form.image} onChange={changeHandler} required />
                     </div>
                     <div className="admin-field">
@@ -202,6 +217,39 @@ const AdminProductFormPage = () => {
                             value={form.countInStock}
                             onChange={changeHandler}
                             required
+                        />
+                    </div>
+                    <div className="admin-field admin-grid-span-full">
+                        <label htmlFor="images">Gallery Image URLs</label>
+                        <textarea
+                            id="images"
+                            name="images"
+                            className="admin-textarea"
+                            value={form.images}
+                            onChange={changeHandler}
+                            placeholder="One URL per line or comma-separated"
+                        />
+                    </div>
+                    <div className="admin-field">
+                        <label htmlFor="colors">Colors</label>
+                        <textarea
+                            id="colors"
+                            name="colors"
+                            className="admin-textarea"
+                            value={form.colors}
+                            onChange={changeHandler}
+                            placeholder="One color per line or comma-separated"
+                        />
+                    </div>
+                    <div className="admin-field">
+                        <label htmlFor="sizes">Sizes</label>
+                        <textarea
+                            id="sizes"
+                            name="sizes"
+                            className="admin-textarea"
+                            value={form.sizes}
+                            onChange={changeHandler}
+                            placeholder="One size per line or comma-separated"
                         />
                     </div>
                     <div className="admin-field admin-grid-span-full">

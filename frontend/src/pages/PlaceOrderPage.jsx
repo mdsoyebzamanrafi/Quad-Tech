@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { Package, Truck, CreditCard } from 'lucide-react';
 import api from '../utils/api';
 import '../styles/CartPage.css'; // Let's reuse some summary styles
+import { getProductOptionSummary } from '../utils/productUtils';
 
 const PlaceOrderPage = () => {
     const navigate = useNavigate();
@@ -305,9 +306,16 @@ const PlaceOrderPage = () => {
                                 {cartItems.map((item, index) => (
                                     <div key={index} style={{ display: 'flex', alignItems: 'center', gap: '1rem', paddingBottom: '1rem', borderBottom: '1px solid var(--border-color)' }}>
                                         <img src={item.image} alt={item.name} style={{ width: '60px', borderRadius: '8px' }} />
-                                        <Link to={`/product/${item.product}`} style={{ flex: 1, color: 'var(--text-main)', textDecoration: 'none', fontWeight: '500' }}>
-                                            {item.name}
-                                        </Link>
+                                        <div style={{ flex: 1 }}>
+                                            <Link to={`/product/${item.product}`} style={{ color: 'var(--text-main)', textDecoration: 'none', fontWeight: '500' }}>
+                                                {item.name}
+                                            </Link>
+                                            {getProductOptionSummary(item) && (
+                                                <div style={{ color: 'var(--text-muted)', marginTop: '0.3rem', fontSize: '0.9rem' }}>
+                                                    {getProductOptionSummary(item)}
+                                                </div>
+                                            )}
+                                        </div>
                                         <div style={{ color: 'var(--text-main)', fontWeight: '600' }}>
                                             {item.qty} x ${item.price} = ${(item.qty * item.price).toFixed(2)}
                                         </div>

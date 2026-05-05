@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useReducer, useEffect } from 'react';
 import api from '../utils/api';
+import { buildCartItemKey } from '../utils/productUtils';
 
 const CartContext = createContext();
 
@@ -13,6 +14,20 @@ const emptyDiscountState = {
     tokenDiscount: 0,
 };
 
+const normalizeCartItem = (item) => {
+    const selectedColor = typeof item?.selectedColor === 'string' ? item.selectedColor.trim() : '';
+    const selectedSize = typeof item?.selectedSize === 'string' ? item.selectedSize.trim() : '';
+
+    return {
+        ...item,
+        selectedColor,
+        selectedSize,
+        cartItemKey:
+            item?.cartItemKey ||
+            buildCartItemKey(item?.product || '', selectedColor, selectedSize),
+    };
+};
+
 const persistedDiscountState = {
     couponCode: localStorage.getItem('couponCode') ? JSON.parse(localStorage.getItem('couponCode')) : '',
     couponDiscount: localStorage.getItem('couponDiscount') ? JSON.parse(localStorage.getItem('couponDiscount')) : 0,
@@ -22,7 +37,9 @@ const persistedDiscountState = {
 };
 
 const initialState = {
-    cartItems: localStorage.getItem('cartItems') ? JSON.parse(localStorage.getItem('cartItems')) : [],
+    cartItems: localStorage.getItem('cartItems')
+        ? JSON.parse(localStorage.getItem('cartItems')).map(normalizeCartItem)
+        : [],
     shippingAddress: localStorage.getItem('shippingAddress') ? JSON.parse(localStorage.getItem('shippingAddress')) : {},
     paymentMethod: localStorage.getItem('paymentMethod') ? JSON.parse(localStorage.getItem('paymentMethod')) : 'Cash on Delivery',
     ...persistedDiscountState,
@@ -31,30 +48,30 @@ const initialState = {
 const cartReducer = (state, action) => {
     switch (action.type) {
         case 'CART_ADD_ITEM': {
-            const item = action.payload;
-            const existItem = state.cartItems.find((x) => x.product === item.product);
+            const item = normalizeCartItem(action.payload);
+            const existItem = state.cartItems.find((x) => x.cartItemKey === item.cartItemKey);
 
             if (existItem) {
                 return {
                     ...state,
                     cartItems: state.cartItems.map((x) =>
-                        x.product === existItem.product ? item : x
+                        x.cartItemKey === existItem.cartItemKey ? item : x
                     ),
                     ...emptyDiscountState,
                 };
-            } else {
-                return {
-                    ...state,
-                    cartItems: [...state.cartItems, item],
-                    ...emptyDiscountState,
-                };
             }
+
+            return {
+                ...state,
+                cartItems: [...state.cartItems, item],
+                ...emptyDiscountState,
+            };
         }
 
         case 'CART_REMOVE_ITEM':
             return {
                 ...state,
-                cartItems: state.cartItems.filter((x) => x.product !== action.payload),
+                cartItems: state.cartItems.filter((x) => x.cartItemKey !== action.payload),
                 ...emptyDiscountState,
             };
 
@@ -133,17 +150,25 @@ export const CartProvider = ({ children }) => {
         localStorage.setItem('tokenDiscount', JSON.stringify(state.tokenDiscount));
     }, [state.couponCode, state.couponDiscount, state.useRewardTokens, state.requestedTokens, state.tokenDiscount]);
 
-    const addToCart = async (id, qty) => {
+    const addToCart = async (id, qty, options = {}) => {
         try {
             const { data } = await api.get(`/api/products/${id}`);
+            const selectedColor =
+                typeof options.selectedColor === 'string' ? options.selectedColor.trim() : '';
+            const selectedSize =
+                typeof options.selectedSize === 'string' ? options.selectedSize.trim() : '';
+
             dispatch({
                 type: 'CART_ADD_ITEM',
                 payload: {
                     product: data._id,
+                    cartItemKey: buildCartItemKey(data._id, selectedColor, selectedSize),
                     name: data.name,
                     image: data.image,
                     price: data.price,
                     countInStock: data.countInStock,
+                    selectedColor,
+                    selectedSize,
                     qty,
                 },
             });

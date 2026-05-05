@@ -4,6 +4,7 @@ import { Package } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import api from '../utils/api';
 import '../styles/LoginPage.css';
+import { getProductOptionSummary } from '../utils/productUtils';
 
 const ORDER_STATUS_LABELS = {
     pending: 'Pending',
@@ -184,7 +185,14 @@ const OrdersPage = () => {
                                                 <td style={{ padding: '1rem 0' }}>
                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                                                         <img src={item.image} alt={item.name} style={{ width: '40px', borderRadius: '4px' }} />
-                                                        <span style={{ fontWeight: '500' }}>{item.name} (x{item.qty})</span>
+                                                        <div>
+                                                            <div style={{ fontWeight: '500' }}>{item.name} (x{item.qty})</div>
+                                                            {getProductOptionSummary(item) && (
+                                                                <div style={{ color: 'var(--text-muted)', fontSize: '0.82rem', marginTop: '0.2rem' }}>
+                                                                    {getProductOptionSummary(item)}
+                                                                </div>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                 </td>
                                                 <td style={{ padding: '1rem 0' }}>{order.createdAt.substring(0, 10)}</td>

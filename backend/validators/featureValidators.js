@@ -45,6 +45,8 @@ const normalizePaymentMethod = (value) => {
     throw new ApiError(400, 'paymentMethod is invalid');
 };
 
+const normalizeOptionalText = (value) => cleanString(value);
+
 const validateCreateOrderInput = (payload) => {
     if (!payload || typeof payload !== 'object') {
         throw new ApiError(400, 'Request body is required');
@@ -59,13 +61,21 @@ const validateCreateOrderInput = (payload) => {
     for (const item of payload.orderItems) {
         const productId = requireObjectId(item.product, 'orderItems.product');
         const quantity = requirePositiveInteger(item.qty, 'orderItems.qty');
-        dedupeMap.set(productId, (dedupeMap.get(productId) || 0) + quantity);
+        const selectedColor = normalizeOptionalText(item.selectedColor);
+        const selectedSize = normalizeOptionalText(item.selectedSize);
+        const itemKey = `${productId}::${selectedColor}::${selectedSize}`;
+        const existing = dedupeMap.get(itemKey) || {
+            productId,
+            quantity: 0,
+            selectedColor,
+            selectedSize,
+        };
+
+        existing.quantity += quantity;
+        dedupeMap.set(itemKey, existing);
     }
 
-    const orderItems = Array.from(dedupeMap.entries()).map(([productId, quantity]) => ({
-        productId,
-        quantity,
-    }));
+    const orderItems = Array.from(dedupeMap.values());
 
     const shippingAddress = payload.shippingAddress || {};
     const addressLine = requireNonEmptyString(shippingAddress.address, 'shippingAddress.address');

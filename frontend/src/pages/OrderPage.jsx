@@ -4,6 +4,7 @@ import { ArrowLeft, CreditCard, Gift, TicketPercent, Truck } from 'lucide-react'
 import { useAuth } from '../context/AuthContext';
 import api from '../utils/api';
 import '../styles/CartPage.css';
+import { getProductOptionSummary } from '../utils/productUtils';
 
 const formatMoney = (value) => `$${(Number(value || 0)).toFixed(2)}`;
 
@@ -88,6 +89,11 @@ const OrderPage = () => {
                                     <img src={item.image} alt={item.name} style={{ width: '64px', borderRadius: '10px' }} />
                                     <div style={{ flex: 1 }}>
                                         <div style={{ color: 'var(--text-main)', fontWeight: 600 }}>{item.name}</div>
+                                        {getProductOptionSummary(item) && (
+                                            <div style={{ color: 'var(--text-muted)', marginTop: '0.2rem' }}>
+                                                {getProductOptionSummary(item)}
+                                            </div>
+                                        )}
                                         <div style={{ color: 'var(--text-muted)' }}>Qty: {item.qty}</div>
                                     </div>
                                     <div style={{ color: 'var(--text-main)', fontWeight: 600 }}>

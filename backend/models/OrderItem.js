@@ -23,6 +23,16 @@ const orderItemSchema = new mongoose.Schema(
             type: String,
             default: '',
         },
+        selectedColor: {
+            type: String,
+            trim: true,
+            default: '',
+        },
+        selectedSize: {
+            type: String,
+            trim: true,
+            default: '',
+        },
         unitPrice: {
             type: Number,
             required: true,
@@ -44,7 +54,7 @@ const orderItemSchema = new mongoose.Schema(
     }
 );
 
-orderItemSchema.index({ order: 1, product: 1 }, { unique: true });
+orderItemSchema.index({ order: 1, product: 1, selectedColor: 1, selectedSize: 1 }, { unique: true });
 
 const OrderItem = mongoose.model('OrderItem', orderItemSchema);
 
