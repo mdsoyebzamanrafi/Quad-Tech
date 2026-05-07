@@ -13,6 +13,7 @@ import {
     Heart,
     Users,
     Sparkles,
+    Gift,
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import api from '../utils/api';
@@ -205,6 +206,11 @@ const Navbar = () => {
                     <button onClick={toggleTheme} className="theme-toggle" aria-label="Toggle Theme">
                         {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
                     </button>
+
+                    <Link to="/gift-assistant" className="nav-item" aria-label="AI Gift Assistant">
+                        <Gift size={20} />
+                        <span className="nav-text">Buy Gifts</span>
+                    </Link>
 
                     {userInfo ? (
                         <div className="nav-item user-dropdown" ref={dropdownRef}>

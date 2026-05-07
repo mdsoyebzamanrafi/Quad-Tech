@@ -1,7 +1,6 @@
 import asyncHandler from '../utils/asyncHandler.js';
 import Friendship from '../models/Friendship.js';
 import User from '../models/User.js';
-import Wishlist from '../models/Wishlist.js';
 
 export const searchUsers = asyncHandler(async (req, res) => {
   const { q } = req.query;
@@ -83,23 +82,7 @@ export const handleFriendRequest = asyncHandler(async (req, res) => {
 });
 
 export const getFriendWishlist = asyncHandler(async (req, res) => {
-  const friendId = req.params.friendId;
-
-  const isFriend = await Friendship.findOne({
-    status: 'accepted',
-    $or: [
-      { requester: req.user._id, recipient: friendId },
-      { requester: friendId, recipient: req.user._id }
-    ]
+  return res.status(403).json({
+    message: 'Friend wishlists are private and only used for gift recommendations.'
   });
-
-  if (!isFriend) {
-    res.status(403);
-    throw new Error('Not friends with this user');
-  }
-
-  const wishlist = await Wishlist.findOne({ user: friendId }).populate('items.product', 'name image price countInStock');
-  const friend = await User.findById(friendId).select('name');
-
-  res.json({ success: true, data: { friend, wishlist: wishlist || { items: [] } } });
 });

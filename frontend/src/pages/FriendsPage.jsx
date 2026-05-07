@@ -38,7 +38,7 @@ const FriendsPage = () => {
             const { data } = await api.get(`/api/friends/search?q=${searchQuery}`);
             setSearchResults(data.data);
             setActiveTab('search');
-        } catch (error) {
+        } catch {
             alert('Search failed');
         } finally {
             setSearchLoading(false);
@@ -59,7 +59,7 @@ const FriendsPage = () => {
             await api.put(`/api/friends/request/${friendshipId}`, { action });
             fetchFriends();
             alert(`Request ${action}ed`);
-        } catch (error) {
+        } catch {
             alert(`Failed to ${action} request`);
         }
     };
@@ -75,7 +75,7 @@ const FriendsPage = () => {
                     <Users className="text-accent-1" size={32} />
                     <h1 style={{ fontSize: '2rem' }}>Friends Hub</h1>
                 </div>
-                <p style={{ color: 'var(--text-muted)' }}>Connect with friends and view their wishlists for perfect gift ideas.</p>
+                <p style={{ color: 'var(--text-muted)' }}>Connect with friends and use the Gift Assistant to find thoughtful picks without exposing private wishlists.</p>
                 
                 <form onSubmit={handleSearch} style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem', maxWidth: '500px' }}>
                     <div style={{ position: 'relative', flex: 1 }}>
@@ -123,13 +123,17 @@ const FriendsPage = () => {
                                             <h3 style={{ color: 'var(--text-main)', margin: 0 }}>{friend.name}</h3>
                                             <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', margin: '0.2rem 0 0' }}>{friend.email}</p>
                                         </div>
-                                        <button 
-                                            className="btn btn-secondary" 
-                                            onClick={() => alert('Viewing friend wishlist coming soon!')}
+                                        <Link
+                                            to="/gift-assistant"
+                                            state={{
+                                                enableFriendWishlist: true,
+                                                prefillFriendIdentifier: friend.email || friend.name || '',
+                                            }}
+                                            className="btn btn-secondary"
                                             style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
                                         >
-                                            <Gift size={16} /> View Wishlist
-                                        </button>
+                                            <Gift size={16} /> Find Gift
+                                        </Link>
                                     </div>
                                 ))}
                             </div>

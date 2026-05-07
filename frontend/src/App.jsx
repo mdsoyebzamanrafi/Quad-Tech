@@ -23,6 +23,7 @@ import FeedbackPage from './pages/FeedbackPage';
 import WishlistPage from './pages/WishlistPage';
 import FriendsPage from './pages/FriendsPage';
 import RecommendationsPage from './pages/RecommendationsPage';
+import GiftAssistantPage from './pages/GiftAssistantPage';
 import AdminRoute from './components/admin/AdminRoute';
 import AdminLayout from './components/admin/AdminLayout';
 import AdminOrdersPage from './pages/admin/AdminOrdersPage';
@@ -74,6 +75,7 @@ function AppContent() {
           <Route path="/wishlist" element={<WishlistPage />} />
           <Route path="/friends" element={<FriendsPage />} />
           <Route path="/recommendations" element={<RecommendationsPage />} />
+          <Route path="/gift-assistant" element={<GiftAssistantPage />} />
           <Route
             path="/admin"
             element={
