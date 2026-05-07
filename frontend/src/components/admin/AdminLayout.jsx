@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
-import { BarChart3, ClipboardList, LayoutDashboard, Package, ShieldCheck, TicketPercent, Users, HelpCircle } from 'lucide-react';
+import { BarChart3, ClipboardList, HelpCircle, LayoutDashboard, Package, Percent, ShieldCheck, TicketPercent, Users } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import '../../styles/Admin.css';
 
@@ -30,6 +30,10 @@ const AdminLayout = () => {
                     <NavLink to="/admin/coupons" className={({ isActive }) => `admin-nav-link ${isActive ? 'active' : ''}`}>
                         <TicketPercent size={18} />
                         Coupons
+                    </NavLink>
+                    <NavLink to="/admin/discounts" className={({ isActive }) => `admin-nav-link ${isActive ? 'active' : ''}`}>
+                        <Percent size={18} />
+                        Smart Discount Rules
                     </NavLink>
                     <NavLink to="/admin/sales" className={({ isActive }) => `admin-nav-link ${isActive ? 'active' : ''}`}>
                         <BarChart3 size={18} />

@@ -34,6 +34,7 @@ import AdminFAQPage from './pages/admin/AdminFAQPage';
 import CouponListPage from './pages/admin/CouponListPage';
 import CouponCreatePage from './pages/admin/CouponCreatePage';
 import CouponEditPage from './pages/admin/CouponEditPage';
+import AdminDiscountsPage from './pages/admin/AdminDiscountsPage';
 import SalesDashboardPage from './pages/admin/SalesDashboardPage';
 import AdminProductsPage from './pages/admin/AdminProductsPage';
 import AdminProductFormPage from './pages/admin/AdminProductFormPage';
@@ -91,6 +92,7 @@ function AppContent() {
             <Route path="products/new" element={<AdminProductFormPage />} />
             <Route path="products/:id" element={<AdminProductFormPage />} />
             <Route path="coupons" element={<CouponListPage />} />
+            <Route path="discounts" element={<AdminDiscountsPage />} />
             <Route path="coupon/create" element={<CouponCreatePage />} />
             <Route path="coupon/:id/edit" element={<CouponEditPage />} />
             <Route path="sales" element={<SalesDashboardPage />} />

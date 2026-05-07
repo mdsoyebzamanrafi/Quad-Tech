@@ -230,6 +230,8 @@ const AdminOrderDetailsPage = () => {
                         <div className="admin-detail-row"><span>Gross Items</span><strong>{formatMoney(order.grossItemsPrice ?? order.subtotal ?? order.itemsPrice)}</strong></div>
                         <div className="admin-detail-row"><span>Coupon Code</span><strong>{order.coupon?.code || 'None'}</strong></div>
                         <div className="admin-detail-row"><span>Coupon Discount</span><strong>{formatMoney(order.coupon?.discountAmount)}</strong></div>
+                        <div className="admin-detail-row"><span>Smart Discount Rule</span><strong>{order.smartDiscount?.ruleName || 'None'}</strong></div>
+                        <div className="admin-detail-row"><span>Smart Discount</span><strong>{formatMoney(order.smartDiscount?.discountAmount)}</strong></div>
                         <div className="admin-detail-row"><span>Tokens Used</span><strong>{order.tokenDiscount?.tokensUsed || 0}</strong></div>
                         <div className="admin-detail-row"><span>Token Discount</span><strong>{formatMoney(order.tokenDiscount?.discountAmount)}</strong></div>
                         <div className="admin-detail-row"><span>Total Discount</span><strong>{formatMoney(order.totalDiscount ?? order.discount)}</strong></div>

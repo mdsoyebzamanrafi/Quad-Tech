@@ -4,8 +4,15 @@ import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { Package, Truck, CreditCard } from 'lucide-react';
 import api from '../utils/api';
+import { getEligibleSmartDiscount } from '../services/discountService';
 import '../styles/CartPage.css'; // Let's reuse some summary styles
 import { getProductOptionSummary } from '../utils/productUtils';
+
+const emptySmartDiscount = {
+    eligible: false,
+    ruleName: '',
+    discountAmount: 0,
+};
 
 const PlaceOrderPage = () => {
     const navigate = useNavigate();
@@ -28,6 +35,7 @@ const PlaceOrderPage = () => {
     const [couponInput, setCouponInput] = useState(savedCouponCode || '');
     const [couponLoading, setCouponLoading] = useState(false);
     const [couponMessage, setCouponMessage] = useState('');
+    const [smartDiscount, setSmartDiscount] = useState(emptySmartDiscount);
     const [tokenMessage, setTokenMessage] = useState('');
     const [requestedTokenInput, setRequestedTokenInput] = useState(savedRequestedTokens ? String(savedRequestedTokens) : '');
 
@@ -39,6 +47,11 @@ const PlaceOrderPage = () => {
         () => Math.round(cartItems.reduce((acc, item) => acc + item.price * item.qty, 0) * 100) / 100,
         [cartItems]
     );
+    const effectiveSmartDiscount = useMemo(() => {
+        const rawSmartDiscount = Math.max(Number(smartDiscount.discountAmount || 0), 0);
+        const remainingAfterCoupon = Math.max(itemsPriceNumber - Number(savedCouponDiscount || 0), 0);
+        return Math.min(rawSmartDiscount, remainingAfterCoupon);
+    }, [itemsPriceNumber, savedCouponDiscount, smartDiscount.discountAmount]);
     const availableTokens = Number(profile?.rewardTokens || 0);
     const tokenPreview = useMemo(() => {
         if (!useRewardTokens) {
@@ -50,8 +63,11 @@ const PlaceOrderPage = () => {
             return { tokensUsed: 0, discountAmount: 0 };
         }
 
-        const remainingAfterCoupon = Math.max(itemsPriceNumber - Number(savedCouponDiscount || 0), 0);
-        const maxDiscount = Math.round((remainingAfterCoupon * 0.2) * 100) / 100;
+        const remainingAfterCouponAndSmart = Math.max(
+            itemsPriceNumber - Number(savedCouponDiscount || 0) - effectiveSmartDiscount,
+            0
+        );
+        const maxDiscount = Math.round((remainingAfterCouponAndSmart * 0.2) * 100) / 100;
         const maxTokensAllowed = Math.floor(maxDiscount * 10);
         const tokensUsed = Math.max(0, Math.min(Math.floor(parsedRequestedTokens), availableTokens, maxTokensAllowed));
 
@@ -59,11 +75,16 @@ const PlaceOrderPage = () => {
             tokensUsed,
             discountAmount: Math.round((tokensUsed / 10) * 100) / 100,
         };
-    }, [availableTokens, itemsPriceNumber, requestedTokenInput, savedCouponDiscount, useRewardTokens]);
-    const netItemsPriceNumber = Math.max(itemsPriceNumber - Number(savedCouponDiscount || 0) - tokenPreview.discountAmount, 0);
+    }, [availableTokens, effectiveSmartDiscount, itemsPriceNumber, requestedTokenInput, savedCouponDiscount, useRewardTokens]);
+    const netItemsPriceNumber = Math.max(
+        itemsPriceNumber - Number(savedCouponDiscount || 0) - effectiveSmartDiscount - tokenPreview.discountAmount,
+        0
+    );
     const shippingPriceNumber = netItemsPriceNumber > 1000 ? 0 : 100;
     const taxPriceNumber = Math.round(netItemsPriceNumber * 0.1 * 100) / 100;
-    const totalDiscountNumber = Math.round((Number(savedCouponDiscount || 0) + tokenPreview.discountAmount) * 100) / 100;
+    const totalDiscountNumber = Math.round(
+        (Number(savedCouponDiscount || 0) + effectiveSmartDiscount + tokenPreview.discountAmount) * 100
+    ) / 100;
     const totalPriceNumber = Math.round((netItemsPriceNumber + shippingPriceNumber + taxPriceNumber) * 100) / 100;
     const itemsPrice = addDecimals(itemsPriceNumber);
     const shippingPrice = addDecimals(shippingPriceNumber);
@@ -84,6 +105,36 @@ const PlaceOrderPage = () => {
             fetchProfile();
         }
     }, [userInfo]);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        const loadSmartDiscount = async () => {
+            if (!userInfo || cartItems.length === 0) {
+                if (!cancelled) {
+                    setSmartDiscount(emptySmartDiscount);
+                }
+                return;
+            }
+
+            try {
+                const data = await getEligibleSmartDiscount(cartItems);
+                if (!cancelled) {
+                    setSmartDiscount(data?.eligible ? data : emptySmartDiscount);
+                }
+            } catch (error) {
+                if (!cancelled) {
+                    setSmartDiscount(emptySmartDiscount);
+                }
+            }
+        };
+
+        loadSmartDiscount();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [cartItems, userInfo]);
 
     useEffect(() => {
         saveTokenUsage({
@@ -264,6 +315,23 @@ const PlaceOrderPage = () => {
                                 )}
                             </div>
 
+                            {smartDiscount.eligible && effectiveSmartDiscount > 0 && (
+                                <div
+                                    style={{
+                                        padding: '0.9rem 1rem',
+                                        borderRadius: '12px',
+                                        border: '1px solid var(--border-color)',
+                                        background: 'var(--bg-primary)',
+                                        color: 'var(--text-main)',
+                                    }}
+                                >
+                                    <strong>{smartDiscount.ruleName}</strong>
+                                    <p style={{ marginTop: '0.35rem', color: 'var(--text-muted)' }}>
+                                        Applied automatically at checkout. Discount: ${addDecimals(effectiveSmartDiscount)}
+                                    </p>
+                                </div>
+                            )}
+
                             <div>
                                 <label style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', color: 'var(--text-main)', marginBottom: '0.5rem' }}>
                                     <input type="checkbox" checked={useRewardTokens} onChange={toggleRewardTokens} />
@@ -339,6 +407,19 @@ const PlaceOrderPage = () => {
                             <span>Coupon Discount</span>
                             <span>- ${addDecimals(savedCouponDiscount || 0)}</span>
                         </div>
+
+                        {smartDiscount.eligible && effectiveSmartDiscount > 0 && (
+                            <>
+                                <div className="summary-row">
+                                    <span>Smart Discount</span>
+                                    <span>- ${addDecimals(effectiveSmartDiscount)}</span>
+                                </div>
+                                <div className="summary-row">
+                                    <span>Rule</span>
+                                    <span>{smartDiscount.ruleName}</span>
+                                </div>
+                            </>
+                        )}
 
                         <div className="summary-row">
                             <span>Token Discount</span>

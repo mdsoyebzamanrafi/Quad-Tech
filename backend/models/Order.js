@@ -49,6 +49,33 @@ const orderSchema = new mongoose.Schema(
                 default: 0,
             },
         },
+        smartDiscount: {
+            ruleId: {
+                type: mongoose.Schema.Types.ObjectId,
+                ref: 'DiscountRule',
+                default: null,
+            },
+            ruleName: {
+                type: String,
+                default: '',
+                trim: true,
+            },
+            discountType: {
+                type: String,
+                default: '',
+                trim: true,
+            },
+            discountValue: {
+                type: Number,
+                min: 0,
+                default: 0,
+            },
+            discountAmount: {
+                type: Number,
+                min: 0,
+                default: 0,
+            },
+        },
         tokenDiscount: {
             tokensUsed: {
                 type: Number,

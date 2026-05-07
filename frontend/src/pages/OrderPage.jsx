@@ -122,6 +122,14 @@ const OrderPage = () => {
                             <span>- {formatMoney(order.coupon?.discountAmount)}</span>
                         </div>
                         <div className="summary-row">
+                            <span>Smart Discount Rule</span>
+                            <span>{order.smartDiscount?.ruleName || 'None'}</span>
+                        </div>
+                        <div className="summary-row">
+                            <span>Smart Discount</span>
+                            <span>- {formatMoney(order.smartDiscount?.discountAmount)}</span>
+                        </div>
+                        <div className="summary-row">
                             <span>Tokens Used</span>
                             <span>{order.tokenDiscount?.tokensUsed || 0}</span>
                         </div>
@@ -158,7 +166,7 @@ const OrderPage = () => {
                         <div style={{ marginTop: '1.25rem', display: 'grid', gap: '0.75rem' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', color: 'var(--text-muted)' }}>
                                 <TicketPercent size={18} />
-                                Coupon discount is recorded at order creation.
+                                Coupon and smart discount snapshots are recorded at order creation.
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', color: 'var(--text-muted)' }}>
                                 <Gift size={18} />

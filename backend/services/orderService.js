@@ -29,9 +29,11 @@ import {
 import { logAudit, getAuditTrail } from './auditLogService.js';
 import { assertOrderStatusTransition, assertPaymentStatusTransition } from './transitionService.js';
 import {
+    calculateBestDiscount,
     calculateOrderTotals,
     calculateTokenDiscount,
     roundPrice,
+    toObjectId,
     validateCouponForUser,
 } from './discountService.js';
 
@@ -69,6 +71,13 @@ const formatOrderForResponse = (order, orderItems, { includeAuditTrail = false, 
         couponId: order.coupon?.couponId || null,
         discountAmount: order.coupon?.discountAmount ?? 0,
     };
+    const smartDiscount = {
+        ruleId: order.smartDiscount?.ruleId || null,
+        ruleName: order.smartDiscount?.ruleName || '',
+        discountType: order.smartDiscount?.discountType || '',
+        discountValue: order.smartDiscount?.discountValue ?? 0,
+        discountAmount: order.smartDiscount?.discountAmount ?? 0,
+    };
     const tokenDiscount = {
         tokensUsed: order.tokenDiscount?.tokensUsed ?? 0,
         discountAmount: order.tokenDiscount?.discountAmount ?? 0,
@@ -87,6 +96,7 @@ const formatOrderForResponse = (order, orderItems, { includeAuditTrail = false, 
         discount: order.totalDiscount ?? order.discount ?? 0,
         totalDiscount: order.totalDiscount ?? order.discount ?? 0,
         coupon,
+        smartDiscount,
         tokenDiscount,
         rewardTokensEarned: order.rewardTokensEarned ?? 0,
         tax: order.tax,
@@ -357,6 +367,7 @@ const createOrder = async ({ authenticatedUser, payload }) => {
         const productMap = new Map(products.map((product) => [String(product._id), product]));
 
         const orderItemDocs = [];
+        const smartDiscountCartItems = [];
         let itemsPrice = 0;
 
         for (const item of validated.orderItems) {
@@ -384,6 +395,14 @@ const createOrder = async ({ authenticatedUser, payload }) => {
                 quantity: item.quantity,
                 lineTotal,
             });
+
+            smartDiscountCartItems.push({
+                product: product._id,
+                quantity: item.quantity,
+                unitPrice,
+                lineTotal,
+                category: product.category || '',
+            });
         }
 
         itemsPrice = roundPrice(itemsPrice);
@@ -401,7 +420,19 @@ const createOrder = async ({ authenticatedUser, payload }) => {
             couponDiscount = couponValidation.discountAmount;
         }
 
-        const remainingAmountAfterCoupon = Math.max(roundPrice(itemsPrice - couponDiscount), 0);
+        const smartDiscountResult = await calculateBestDiscount(user._id, validated.orderItems, {
+            user,
+            normalizedCartItems: smartDiscountCartItems,
+            subtotal: itemsPrice,
+            productsById: productMap,
+            session,
+        });
+        const smartDiscountAmount = roundPrice(Math.min(
+            Math.max(Number(smartDiscountResult.discountAmount || 0), 0),
+            Math.max(roundPrice(itemsPrice - couponDiscount), 0)
+        ));
+
+        const remainingAmountAfterCoupon = Math.max(roundPrice(itemsPrice - couponDiscount - smartDiscountAmount), 0);
         const tokenUsage = calculateTokenDiscount({
             user,
             requestedTokens: validated.requestedTokens,
@@ -409,6 +440,7 @@ const createOrder = async ({ authenticatedUser, payload }) => {
         });
         const totals = calculateOrderTotals({
             itemsPrice,
+            smartDiscount: smartDiscountAmount,
             couponDiscount,
             tokenDiscount: tokenUsage.discountAmount,
         });
@@ -429,6 +461,13 @@ const createOrder = async ({ authenticatedUser, payload }) => {
                             discountAmount: totals.couponDiscount,
                         }
                         : undefined,
+                    smartDiscount: {
+                        ruleId: smartDiscountResult.eligible ? toObjectId(smartDiscountResult.ruleId) : null,
+                        ruleName: smartDiscountResult.ruleName || '',
+                        discountType: smartDiscountResult.discountType || '',
+                        discountValue: smartDiscountResult.discountValue || 0,
+                        discountAmount: totals.smartDiscount,
+                    },
                     tokenDiscount: {
                         tokensUsed: tokenUsage.tokensUsed,
                         discountAmount: totals.tokenDiscount,
@@ -489,6 +528,7 @@ const createOrder = async ({ authenticatedUser, payload }) => {
                 orderStatus: createdOrder.orderStatus,
                 paymentStatus: createdOrder.paymentStatus,
                 couponCode: createdOrder.coupon?.code || null,
+                smartDiscountRule: createdOrder.smartDiscount?.ruleName || null,
                 totalDiscount: createdOrder.totalDiscount,
                 total: createdOrder.total,
             },

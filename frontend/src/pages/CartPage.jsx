@@ -4,8 +4,15 @@ import { ShoppingBag, X, ArrowRight, Tag } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import api from '../utils/api';
+import { getEligibleSmartDiscount } from '../services/discountService';
 import '../styles/CartPage.css';
 import { getProductOptionSummary } from '../utils/productUtils';
+
+const emptySmartDiscount = {
+    eligible: false,
+    ruleName: '',
+    discountAmount: 0,
+};
 
 const CartPage = () => {
     const {
@@ -24,6 +31,7 @@ const CartPage = () => {
     const [couponError, setCouponError] = useState('');
     const [couponNotice, setCouponNotice] = useState('');
     const [couponLoading, setCouponLoading] = useState(false);
+    const [smartDiscount, setSmartDiscount] = useState(emptySmartDiscount);
     const previousCouponRef = useRef(couponCode);
     const manualRemoveRef = useRef(false);
 
@@ -34,7 +42,11 @@ const CartPage = () => {
         [cartItems]
     );
     const safeCouponDiscount = Math.min(Math.max(Number(couponDiscount || 0), 0), itemsPriceNumber);
-    const displayedTotal = Math.max(itemsPriceNumber - safeCouponDiscount, 0);
+    const effectiveSmartDiscount = Math.min(
+        Math.max(Number(smartDiscount.discountAmount || 0), 0),
+        Math.max(itemsPriceNumber - safeCouponDiscount, 0)
+    );
+    const displayedTotal = Math.max(itemsPriceNumber - safeCouponDiscount - effectiveSmartDiscount, 0);
 
     useEffect(() => {
         if (couponCode) {
@@ -50,6 +62,36 @@ const CartPage = () => {
         previousCouponRef.current = '';
         manualRemoveRef.current = false;
     }, [couponCode]);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        const loadSmartDiscount = async () => {
+            if (!userInfo || cartItems.length === 0) {
+                if (!cancelled) {
+                    setSmartDiscount(emptySmartDiscount);
+                }
+                return;
+            }
+
+            try {
+                const data = await getEligibleSmartDiscount(cartItems);
+                if (!cancelled) {
+                    setSmartDiscount(data?.eligible ? data : emptySmartDiscount);
+                }
+            } catch (error) {
+                if (!cancelled) {
+                    setSmartDiscount(emptySmartDiscount);
+                }
+            }
+        };
+
+        loadSmartDiscount();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [cartItems, userInfo]);
 
     const checkoutHandler = () => {
         if (!userInfo) {
@@ -237,6 +279,18 @@ const CartPage = () => {
                                 </div>
 
                                 <div className="summary-divider"></div>
+
+                                {smartDiscount.eligible && effectiveSmartDiscount > 0 && (
+                                    <>
+                                        <div className="summary-row">
+                                            <span>Smart Discount</span>
+                                            <span style={{ color: 'var(--color-accent-3)' }}>- ${addDecimals(effectiveSmartDiscount)}</span>
+                                        </div>
+                                        <p className="coupon-message success">
+                                            Smart discount applied: {smartDiscount.ruleName}
+                                        </p>
+                                    </>
+                                )}
 
                                 <div className="summary-row total-row">
                                     <span>Total</span>
