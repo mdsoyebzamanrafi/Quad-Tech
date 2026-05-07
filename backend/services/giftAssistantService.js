@@ -56,7 +56,7 @@ const serializeGiftProduct = (product = {}) => ({
     sponsoredWeight: toNumber(product.sponsoredWeight),
 });
 
-const formatTaka = (amount) => `৳${Math.round(Number(amount) || 0)}`;
+const formatTaka = (amount) => `$${Math.round(Number(amount) || 0)}`;
 
 const buildBudgetPhrase = (giftContext) => {
     const budgetMin = hasNumericValue(giftContext?.budgetMin) ? Number(giftContext.budgetMin) : null;

@@ -360,11 +360,11 @@ const GiftAssistantPage = () => {
                     <div className="gift-badge-row">
                         <span className="gift-badge">
                             <BadgeCheck size={16} />
-                            Real products only
+                            Gifts for youyr loved ones
                         </span>
                         <span className="gift-badge">
                             <CalendarHeart size={16} />
-                            Bangladesh occasion aware
+                            For any Occasions
                         </span>
                         <span className="gift-badge">
                             <Sparkles size={16} />

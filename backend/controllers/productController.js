@@ -491,6 +491,7 @@ const updateProduct = async (req, res) => {
         product.adminPriorityScore = payload.adminPriorityScore ?? product.adminPriorityScore;
         product.isSponsored = payload.isSponsored ?? product.isSponsored;
         product.sponsoredWeight = payload.sponsoredWeight ?? product.sponsoredWeight;
+        product.user = product.user || req.user._id;
 
         const updatedProduct = await product.save();
 

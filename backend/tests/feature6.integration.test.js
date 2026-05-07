@@ -148,6 +148,39 @@ test('admin can update product and keep valid 0 and false values', async () => {
     assert.equal(freshProduct.isActive, false);
 });
 
+test('admin product update repairs legacy products missing user', async () => {
+    const admin = await createUser({ role: USER_ROLES.ADMIN, email: uniqueEmail('admin') });
+    const { insertedId } = await Product.collection.insertOne({
+        name: 'Legacy Product',
+        image: '/images/legacy.jpg',
+        images: ['/images/legacy.jpg'],
+        brand: 'BrandX',
+        category: 'CategoryY',
+        description: 'Legacy product without owner',
+        price: 250,
+        countInStock: 4,
+        numReviews: 0,
+        rating: 0,
+        isActive: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+    });
+
+    const res = await request(app)
+        .put(`/api/products/${insertedId}`)
+        .set(authHeaderFor(admin._id))
+        .send({
+            name: 'Recovered Legacy Product',
+        });
+
+    assert.equal(res.status, 200);
+    assert.equal(res.body.name, 'Recovered Legacy Product');
+    assert.equal(String(res.body.user), String(admin._id));
+
+    const freshProduct = await Product.findById(insertedId).lean();
+    assert.equal(String(freshProduct.user), String(admin._id));
+});
+
 test('admin can update stock and stock endpoint allows zero', async () => {
     const admin = await createUser({ role: USER_ROLES.ADMIN, email: uniqueEmail('admin') });
     const product = await createProduct({ owner: admin._id, countInStock: 9 });
