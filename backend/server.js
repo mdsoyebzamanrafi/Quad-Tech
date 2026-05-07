@@ -1,9 +1,7 @@
-import dotenv from 'dotenv';
+import 'dotenv/config';
 import connectDB from './config/db.js';
 import ensureInitialSuperAdmin from './bootstrap/ensureSuperAdmin.js';
 import app from './app.js';
-
-dotenv.config();
 
 const PORT = process.env.PORT || 5000;
 

@@ -25,3 +25,271 @@
     color: var(--text-muted);
     font-size: 1rem;
 }
+
+.prompt-recommendation-panel {
+    margin: 2rem 0 1rem;
+    padding: 2rem;
+    border-radius: 32px;
+    border: 1px solid var(--border-color);
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.84), rgba(255, 255, 255, 0.62));
+}
+
+.dark .prompt-recommendation-panel {
+    background: linear-gradient(180deg, rgba(23, 23, 23, 0.92), rgba(23, 23, 23, 0.74));
+}
+
+.prompt-recommendation-header {
+    margin-bottom: 1.25rem;
+}
+
+.prompt-recommendation-header .recommendations-page-kicker {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+}
+
+.prompt-recommendation-header h2 {
+    font-size: clamp(1.8rem, 3vw, 2.6rem);
+    margin-bottom: 0.45rem;
+}
+
+.prompt-recommendation-header p:last-child,
+.prompt-empty-state,
+.prompt-result-eyebrow {
+    color: var(--text-muted);
+}
+
+.prompt-login-link {
+    width: fit-content;
+}
+
+.prompt-recommendation-form {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 1rem;
+    align-items: center;
+}
+
+.prompt-input-wrap {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    min-width: 0;
+    padding: 0.95rem 1.15rem;
+    border: 1px solid var(--border-color);
+    border-radius: 9999px;
+    background: var(--bg-secondary);
+    color: var(--text-muted);
+}
+
+.prompt-input-wrap input {
+    width: 100%;
+    min-width: 0;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: var(--text-main);
+    font: inherit;
+}
+
+.prompt-input-wrap input::placeholder {
+    color: var(--text-muted);
+}
+
+.prompt-submit-btn {
+    white-space: nowrap;
+}
+
+.prompt-suggestion-row,
+.prompt-intent-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+}
+
+.prompt-suggestion-row {
+    margin: 1rem 0 0;
+}
+
+.prompt-suggestion-chip {
+    padding: 0.62rem 0.95rem;
+    border-radius: 9999px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+    color: var(--text-main);
+    font-weight: 600;
+    transition: transform 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.prompt-suggestion-chip:hover:not(:disabled) {
+    transform: translateY(-1px);
+    border-color: var(--color-accent-1);
+    color: var(--color-accent-1);
+}
+
+.prompt-suggestion-chip:disabled,
+.prompt-submit-btn:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+}
+
+.prompt-empty-state,
+.prompt-error-message,
+.prompt-status-row {
+    margin-top: 1.25rem;
+}
+
+.prompt-error-message {
+    color: var(--color-accent-1);
+    font-weight: 700;
+}
+
+.prompt-status-row {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.55rem;
+    color: var(--color-accent-1);
+    font-weight: 700;
+}
+
+.prompt-results-shell {
+    margin-top: 1.5rem;
+}
+
+.prompt-result-summary {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.prompt-result-summary h3 {
+    font-size: 1.5rem;
+}
+
+.prompt-fallback-message {
+    max-width: 420px;
+    padding: 0.8rem 1rem;
+    border-radius: 18px;
+    border: 1px solid rgba(236, 72, 153, 0.24);
+    background: rgba(236, 72, 153, 0.08);
+    color: var(--text-main);
+    font-weight: 600;
+}
+
+.prompt-intent-chips {
+    align-items: center;
+    margin-bottom: 1.25rem;
+}
+
+.prompt-intent-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    color: var(--text-muted);
+    font-weight: 700;
+}
+
+.prompt-products-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 1rem;
+}
+
+.prompt-product-card {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-width: 0;
+    border: 1px solid var(--border-color);
+    border-radius: 24px;
+    background: var(--bg-secondary);
+    box-shadow: var(--shadow-sm);
+}
+
+.prompt-product-image {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    aspect-ratio: 1;
+    padding: 1.25rem;
+    background:
+        radial-gradient(circle at top left, rgba(236, 72, 153, 0.08), transparent 42%),
+        radial-gradient(circle at bottom right, rgba(139, 92, 246, 0.08), transparent 45%);
+}
+
+.prompt-product-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.prompt-product-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+    height: 100%;
+    padding: 1.15rem;
+}
+
+.prompt-product-body h3 {
+    font-size: 1.08rem;
+    line-height: 1.35;
+}
+
+.prompt-product-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.85rem;
+    margin-top: auto;
+}
+
+.prompt-details-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    color: var(--color-accent-1);
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+@media (max-width: 1200px) {
+    .prompt-products-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 900px) {
+    .prompt-recommendation-form,
+    .prompt-products-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .prompt-submit-btn {
+        width: 100%;
+    }
+
+    .prompt-result-summary {
+        flex-direction: column;
+    }
+}
+
+@media (max-width: 640px) {
+    .prompt-recommendation-panel {
+        padding: 1.25rem;
+        border-radius: 22px;
+    }
+
+    .prompt-input-wrap {
+        border-radius: 18px;
+    }
+
+    .prompt-suggestion-chip,
+    .prompt-details-link,
+    .recommended-chip {
+        font-size: 0.9rem;
+    }
+}

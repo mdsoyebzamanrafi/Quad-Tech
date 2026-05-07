@@ -14,12 +14,26 @@ import '../styles/RecommendedForYou.css';
 const buildMatchPercent = (finalScore) =>
     Math.min(99, Math.max(50, Math.round(Number(finalScore) || 0)));
 
+const formatItemCount = (count) => `${count} ${Number(count) === 1 ? 'item' : 'items'}`;
+
 const toSummaryEntries = (contextSummary) => {
     if (!contextSummary) {
         return [];
     }
 
     const entries = [
+        ...(Number(contextSummary.cloudClosetCount) > 0
+            ? [{
+                label: 'Cloud Closet',
+                value: formatItemCount(contextSummary.cloudClosetCount),
+            }]
+            : []),
+        ...(Number(contextSummary.cartCount) > 0
+            ? [{
+                label: 'Cart',
+                value: formatItemCount(contextSummary.cartCount),
+            }]
+            : []),
         ...(contextSummary.preferredDepartments || []).map((value) => ({
             label: 'Department',
             value,
@@ -155,7 +169,7 @@ const RecommendedForYou = ({ variant = 'section' }) => {
                     <p className="recommended-kicker">Recommended For You</p>
                     <h2>Your feed needs more signals</h2>
                     <p className="recommended-state-text">
-                        Add items to your wishlist or place an order to get better recommendations.
+                        Add items to your cart, wishlist, Cloud Closet, or order history to get better recommendations.
                     </p>
                 </div>
             </section>
@@ -170,7 +184,7 @@ const RecommendedForYou = ({ variant = 'section' }) => {
                         <p className="recommended-kicker">Recommended For You</p>
                         <h2>
                             {isPageVariant
-                                ? 'Based on your orders, wishlist, and preferences'
+                                ? 'Based on your orders, cart, wishlist, Cloud Closet, and preferences'
                                 : 'Your next five likely picks'}
                         </h2>
                     </div>

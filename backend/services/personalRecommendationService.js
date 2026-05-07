@@ -74,8 +74,10 @@ const buildFallbackRecommendations = (availableProducts) => {
             finalScore,
             scoreBreakdown: {
                 wishlistScore: 0,
+                cartScore: 0,
                 purchaseHistoryScore: 0,
                 similarityScore: 0,
+                cloudClosetScore: 0,
                 priceScore: 0,
                 friendBoostScore: 0,
                 stockScore,
@@ -96,7 +98,9 @@ const getPersonalRecommendations = async (userId) => {
     const context = await buildRecommendationContext(userId);
     const hasPersonalSignals =
         Number(context.contextSummary?.orderCount || 0) > 0 ||
-        Number(context.contextSummary?.wishlistCount || 0) > 0;
+        Number(context.contextSummary?.wishlistCount || 0) > 0 ||
+        Number(context.contextSummary?.cartCount || 0) > 0 ||
+        Number(context.contextSummary?.cloudClosetCount || 0) > 0;
 
     if (!hasPersonalSignals) {
         return {

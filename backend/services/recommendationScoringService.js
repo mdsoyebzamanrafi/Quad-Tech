@@ -30,6 +30,9 @@ const addReason = (reasons, message) => {
 const isExactWishlistProduct = (productId, wishlistProducts) =>
     wishlistProducts.some((wishlistProduct) => toObjectIdString(wishlistProduct._id) === productId);
 
+const isExactCartProduct = (productId, cartProducts) =>
+    cartProducts.some((cartProduct) => toObjectIdString(cartProduct._id) === productId);
+
 const hasCategoryMatch = (product, products) =>
     products.some((item) => safeString(item.category) && safeString(item.category) === safeString(product.category));
 
@@ -94,7 +97,9 @@ const scoreProduct = (rawProduct, context) => {
     const normalizedDepartmentValue = normalizeDepartment(product.department);
     const purchasedProductIds = new Set((context.purchasedProductIds || []).map((id) => toObjectIdString(id)));
     const wishlistProducts = context.wishlistProducts || [];
+    const cartProducts = context.cartProducts || [];
     const purchasedProducts = context.purchasedProducts || [];
+    const cloudClosetItems = context.cloudClosetItems || [];
     const friendWishlistProducts = context.friendWishlistProducts || [];
     const preferenceProfile = context.preferenceProfile || {};
 
@@ -142,6 +147,44 @@ const scoreProduct = (rawProduct, context) => {
         8,
         reasons,
         'Fits seasons you saved in your wishlist.'
+    );
+
+    let cartScore = 0;
+    if (isExactCartProduct(productId, cartProducts)) {
+        cartScore += 35;
+        addReason(reasons, 'This product is already in your cart.');
+    }
+    if (hasCategoryMatch(product, cartProducts)) {
+        cartScore += 22;
+        addReason(reasons, 'Matches a category from your cart.');
+    }
+    if (hasBrandMatch(product, cartProducts)) {
+        cartScore += 12;
+        addReason(reasons, 'Matches a brand from your cart.');
+    }
+    cartScore += hasFashionMetadataOverlap(
+        product,
+        cartProducts,
+        'colors',
+        8,
+        reasons,
+        'Matches colors from products in your cart.'
+    );
+    cartScore += hasFashionMetadataOverlap(
+        product,
+        cartProducts,
+        'styleTags',
+        10,
+        reasons,
+        'Matches styles from products in your cart.'
+    );
+    cartScore += hasFashionMetadataOverlap(
+        product,
+        cartProducts,
+        'productType',
+        8,
+        reasons,
+        'Similar to product types in your cart.'
     );
 
     let purchaseHistoryScore = 0;
@@ -229,6 +272,70 @@ const scoreProduct = (rawProduct, context) => {
         }
     }
 
+    let cloudClosetScore = 0;
+    if (normalizedDepartmentValue === 'fashion' && cloudClosetItems.length > 0) {
+        if (hasCategoryMatch(product, cloudClosetItems)) {
+            cloudClosetScore += 15;
+            addReason(reasons, 'Matches clothing styles from your Cloud Closet.');
+        }
+        cloudClosetScore += hasFashionMetadataOverlap(
+            product,
+            cloudClosetItems,
+            'colors',
+            10,
+            reasons,
+            'Matches colors from clothes you own.'
+        );
+        cloudClosetScore += hasFashionMetadataOverlap(
+            product,
+            cloudClosetItems,
+            'styleTags',
+            12,
+            reasons,
+            'Matches styles from your Cloud Closet.'
+        );
+        cloudClosetScore += hasFashionMetadataOverlap(
+            product,
+            cloudClosetItems,
+            'productType',
+            12,
+            reasons,
+            'Similar to items in your Cloud Closet.'
+        );
+        cloudClosetScore += hasFashionMetadataOverlap(
+            product,
+            cloudClosetItems,
+            'material',
+            8,
+            reasons,
+            'Matches materials from your Cloud Closet.'
+        );
+        cloudClosetScore += hasFashionMetadataOverlap(
+            product,
+            cloudClosetItems,
+            'season',
+            8,
+            reasons,
+            'Fits seasons from your Cloud Closet.'
+        );
+        cloudClosetScore += hasFashionMetadataOverlap(
+            product,
+            cloudClosetItems,
+            'occasion',
+            8,
+            reasons,
+            'Fits occasions from your Cloud Closet.'
+        );
+        cloudClosetScore += hasFashionMetadataOverlap(
+            product,
+            cloudClosetItems,
+            'fit',
+            8,
+            reasons,
+            'Matches fits from your Cloud Closet.'
+        );
+    }
+
     let priceScore = 5;
     const averagePrice = safeNumber(preferenceProfile.averagePrice);
     const productPrice = safeNumber(product.price);
@@ -297,8 +404,10 @@ const scoreProduct = (rawProduct, context) => {
 
     const scoreBreakdown = {
         wishlistScore,
+        cartScore,
         purchaseHistoryScore,
         similarityScore,
+        cloudClosetScore,
         priceScore,
         friendBoostScore,
         stockScore,
