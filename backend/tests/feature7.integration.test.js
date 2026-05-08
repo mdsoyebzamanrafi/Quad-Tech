@@ -471,6 +471,173 @@ test('role update route rejects non-super-admin users', async () => {
     assert.equal(res.status, 403);
 });
 
+test('bulk confirm-and-deliver route rejects normal admins with explicit message', async () => {
+    const admin = await createUser({ role: USER_ROLES.ADMIN, email: uniqueEmail('admin') });
+
+    const res = await request(app)
+        .patch('/api/orders/admin/confirm-and-deliver-all')
+        .set(authHeaderFor(admin._id));
+
+    assert.equal(res.status, 403);
+    assert.deepEqual(res.body, {
+        success: false,
+        message: 'Only Super Admin can perform this action.',
+    });
+});
+
+test('super admin can bulk confirm and deliver eligible orders without changing payment status', async () => {
+    const superAdmin = await createUser({ role: USER_ROLES.SUPER_ADMIN, email: uniqueEmail('super') });
+    const admin = await createUser({ role: USER_ROLES.ADMIN, email: uniqueEmail('admin') });
+    const customer = await createUser({ email: uniqueEmail('customer') });
+    const product = await createProduct({ owner: admin._id, price: 110, countInStock: 20 });
+
+    const pending = await createOrderWithSingleItem({
+        user: customer,
+        product,
+        orderStatus: ORDER_STATUSES.PENDING,
+        paymentStatus: PAYMENT_STATUSES.UNPAID,
+        stockReduced: false,
+    });
+    const confirmed = await createOrderWithSingleItem({
+        user: customer,
+        product,
+        orderStatus: ORDER_STATUSES.CONFIRMED,
+        paymentStatus: PAYMENT_STATUSES.PENDING,
+        stockReduced: true,
+    });
+    const processing = await createOrderWithSingleItem({
+        user: customer,
+        product,
+        orderStatus: ORDER_STATUSES.PROCESSING,
+        paymentStatus: PAYMENT_STATUSES.PAID,
+        stockReduced: true,
+    });
+    const shipped = await createOrderWithSingleItem({
+        user: customer,
+        product,
+        orderStatus: ORDER_STATUSES.SHIPPED,
+        paymentStatus: PAYMENT_STATUSES.UNPAID,
+        stockReduced: true,
+    });
+
+    const delivered = await createOrderWithSingleItem({
+        user: customer,
+        product,
+        orderStatus: ORDER_STATUSES.DELIVERED,
+        paymentStatus: PAYMENT_STATUSES.UNPAID,
+        stockReduced: true,
+    });
+    const cancelled = await createOrderWithSingleItem({
+        user: customer,
+        product,
+        orderStatus: ORDER_STATUSES.CANCELLED,
+        paymentStatus: PAYMENT_STATUSES.UNPAID,
+        stockReduced: false,
+    });
+    const refundRequested = await createOrderWithSingleItem({
+        user: customer,
+        product,
+        orderStatus: ORDER_STATUSES.REFUND_REQUESTED,
+        paymentStatus: PAYMENT_STATUSES.PAID,
+        stockReduced: true,
+    });
+    const refunded = await createOrderWithSingleItem({
+        user: customer,
+        product,
+        orderStatus: ORDER_STATUSES.REFUNDED,
+        paymentStatus: PAYMENT_STATUSES.REFUNDED,
+        stockReduced: true,
+    });
+    const failed = await createOrderWithSingleItem({
+        user: customer,
+        product,
+        orderStatus: ORDER_STATUSES.FAILED,
+        paymentStatus: PAYMENT_STATUSES.FAILED,
+        stockReduced: false,
+    });
+
+    const res = await request(app)
+        .patch('/api/orders/admin/confirm-and-deliver-all')
+        .set(authHeaderFor(superAdmin._id));
+
+    assert.equal(res.status, 200);
+    assert.equal(res.body.success, true);
+    assert.equal(res.body.message, 'All eligible orders have been confirmed and marked as delivered.');
+    assert.equal(res.body.deliveredOrders, 4);
+    assert.equal(res.body.skippedOrders, 5);
+
+    const refreshed = await Order.find({
+        _id: {
+            $in: [pending._id, confirmed._id, processing._id, shipped._id, delivered._id, cancelled._id, refundRequested._id, refunded._id, failed._id],
+        },
+    }).lean();
+    const byId = new Map(refreshed.map((order) => [String(order._id), order]));
+
+    for (const deliverableOrder of [pending, confirmed, processing, shipped]) {
+        const order = byId.get(String(deliverableOrder._id));
+        assert.equal(order.orderStatus, ORDER_STATUSES.DELIVERED);
+        assert.ok(order.deliveredAt);
+        assert.equal(String(order.deliveredBy), String(superAdmin._id));
+        assert.equal(order.bulkDelivered, true);
+    }
+
+    assert.equal(byId.get(String(pending._id)).paymentStatus, PAYMENT_STATUSES.UNPAID);
+    assert.equal(byId.get(String(confirmed._id)).paymentStatus, PAYMENT_STATUSES.PENDING);
+    assert.equal(byId.get(String(processing._id)).paymentStatus, PAYMENT_STATUSES.PAID);
+    assert.equal(byId.get(String(shipped._id)).paymentStatus, PAYMENT_STATUSES.UNPAID);
+    assert.equal(byId.get(String(pending._id)).stockReduced, true);
+
+    assert.equal(byId.get(String(delivered._id)).orderStatus, ORDER_STATUSES.DELIVERED);
+    assert.equal(byId.get(String(delivered._id)).bulkDelivered, false);
+    assert.equal(byId.get(String(cancelled._id)).orderStatus, ORDER_STATUSES.CANCELLED);
+    assert.equal(byId.get(String(refundRequested._id)).orderStatus, ORDER_STATUSES.REFUND_REQUESTED);
+    assert.equal(byId.get(String(refunded._id)).orderStatus, ORDER_STATUSES.REFUNDED);
+    assert.equal(byId.get(String(failed._id)).orderStatus, ORDER_STATUSES.FAILED);
+
+    const refreshedProduct = await Product.findById(product._id).lean();
+    assert.equal(refreshedProduct.countInStock, 19);
+
+    const logs = await AuditLog.find({
+        actorUser: superAdmin._id,
+        action: AUDIT_ACTIONS.ORDER_STATUS_UPDATED,
+    }).lean();
+    assert.equal(logs.length, 4);
+});
+
+test('bulk confirm-and-deliver returns success when no eligible orders exist', async () => {
+    const superAdmin = await createUser({ role: USER_ROLES.SUPER_ADMIN, email: uniqueEmail('super') });
+    const admin = await createUser({ role: USER_ROLES.ADMIN, email: uniqueEmail('admin') });
+    const customer = await createUser({ email: uniqueEmail('customer') });
+    const product = await createProduct({ owner: admin._id, price: 90, countInStock: 10 });
+
+    await createOrderWithSingleItem({
+        user: customer,
+        product,
+        orderStatus: ORDER_STATUSES.DELIVERED,
+        paymentStatus: PAYMENT_STATUSES.PAID,
+        stockReduced: true,
+    });
+    await createOrderWithSingleItem({
+        user: customer,
+        product,
+        orderStatus: ORDER_STATUSES.CANCELLED,
+        paymentStatus: PAYMENT_STATUSES.UNPAID,
+        stockReduced: false,
+    });
+
+    const res = await request(app)
+        .patch('/api/orders/admin/confirm-and-deliver-all')
+        .set(authHeaderFor(superAdmin._id));
+
+    assert.equal(res.status, 200);
+    assert.deepEqual(res.body, {
+        success: true,
+        message: 'No eligible orders found to confirm and deliver.',
+        deliveredOrders: 0,
+        skippedOrders: 2,
+    });
+});
+
 test('blocked/deleted users cannot authenticate or access protected routes', async () => {
     const blocked = await createUser({
         email: uniqueEmail('blocked'),

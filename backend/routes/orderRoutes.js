@@ -11,8 +11,9 @@ import {
     updateOrderStatusAdmin,
     updatePaymentStatusAdmin,
     updateAdminNoteController,
+    confirmAndDeliverAllOrdersAdmin,
 } from '../controllers/orderController.js';
-import { protect, requireActiveAdmin } from '../middleware/authMiddleware.js';
+import { protect, requireActiveAdmin, requireActiveSuperAdmin } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
@@ -27,6 +28,7 @@ router.put('/:id/deliver', protect, markOwnOrderAsReceived);
 
 // Admin order management endpoints
 router.get('/admin', protect, requireActiveAdmin, getAllOrdersAdmin);
+router.patch('/admin/confirm-and-deliver-all', protect, requireActiveSuperAdmin, confirmAndDeliverAllOrdersAdmin);
 router.get('/admin/:id', protect, requireActiveAdmin, getOrderByIdAdmin);
 router.patch('/admin/:id/status', protect, requireActiveAdmin, updateOrderStatusAdmin);
 router.patch('/admin/:id/payment-status', protect, requireActiveAdmin, updatePaymentStatusAdmin);

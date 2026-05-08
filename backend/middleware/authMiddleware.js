@@ -5,6 +5,7 @@ import asyncHandler from '../utils/asyncHandler.js';
 import {
     ADMIN_ROLE_SET,
     AUTH_BLOCKED_STATUS_SET,
+    USER_ROLES,
     USER_STATUSES,
 } from '../constants/domainConstants.js';
 
@@ -68,6 +69,25 @@ const requireActiveAdmin = (req, res, next) => {
     next();
 };
 
+const requireActiveSuperAdmin = (req, res, next) => {
+    if (!req.user) {
+        throw new ApiError(401, 'Not authorized');
+    }
+
+    if (req.user.role !== USER_ROLES.SUPER_ADMIN) {
+        return res.status(403).json({
+            success: false,
+            message: 'Only Super Admin can perform this action.',
+        });
+    }
+
+    if (req.user.status !== USER_STATUSES.ACTIVE || req.user.deletedAt) {
+        throw new ApiError(403, 'Super Admin access requires an active account');
+    }
+
+    next();
+};
+
 const admin = requireActiveAdmin;
 
-export { protect, admin, requireRoles, requireActiveAdmin };
+export { protect, admin, requireRoles, requireActiveAdmin, requireActiveSuperAdmin };

@@ -13,6 +13,7 @@ import {
     PAYMENT_METHODS,
     PAYMENT_STATUSES,
     SHOPPER_ROLE_SET,
+    USER_ROLES,
     USER_STATUSES,
 } from '../constants/domainConstants.js';
 import {
@@ -39,6 +40,12 @@ import {
 
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const REWARD_TOKEN_RATE = Number(process.env.REWARD_TOKEN_RATE ?? 5);
+const BULK_DELIVERABLE_STATUSES = Object.freeze([
+    ORDER_STATUSES.PENDING,
+    ORDER_STATUSES.CONFIRMED,
+    ORDER_STATUSES.PROCESSING,
+    ORDER_STATUSES.SHIPPED,
+]);
 
 const buildPaymentStatusFromMethod = (paymentMethod) => {
     if (paymentMethod === PAYMENT_METHODS.CASH_ON_DELIVERY || paymentMethod === PAYMENT_METHODS.PLACEHOLDER) {
@@ -123,6 +130,8 @@ const formatOrderForResponse = (order, orderItems, { includeAuditTrail = false, 
         paidAt: order.paidAt,
         refundedAt: order.refundedAt,
         deliveredAt: order.deliveredAt,
+        deliveredBy: order.deliveredBy,
+        bulkDelivered: order.bulkDelivered ?? false,
         cancelledAt: order.cancelledAt,
         confirmedAt: order.confirmedAt,
         processingAt: order.processingAt,
@@ -162,6 +171,20 @@ const getOrderItemsMap = async (orderIds, session = null) => {
     }
 
     return grouped;
+};
+
+const buildNonDeletedOrderScope = () => {
+    const query = {};
+
+    if (Order.schema.path('isDeleted')) {
+        query.isDeleted = { $ne: true };
+    }
+
+    if (Order.schema.path('deletedAt')) {
+        query.deletedAt = null;
+    }
+
+    return query;
 };
 
 const getOrderWithItemsOrThrow = async (orderId, session = null) => {
@@ -947,6 +970,87 @@ const updateAdminNote = async ({ orderId, note, actor }) => {
     return getOrderForAdmin({ orderId, includeAuditTrail: true });
 };
 
+const confirmAndDeliverAllOrdersBySuperAdmin = async ({ actor }) => {
+    if (!actor || actor.role !== USER_ROLES.SUPER_ADMIN || actor.status !== USER_STATUSES.ACTIVE || actor.deletedAt) {
+        throw new ApiError(403, 'Only Super Admin can perform this action.');
+    }
+
+    const session = await mongoose.startSession();
+
+    try {
+        session.startTransaction();
+
+        const baseQuery = buildNonDeletedOrderScope();
+        const totalNonDeletedOrders = await Order.countDocuments(baseQuery).session(session);
+        const eligibleOrders = await Order.find({
+            ...baseQuery,
+            orderStatus: { $in: BULK_DELIVERABLE_STATUSES },
+        }).session(session);
+
+        if (eligibleOrders.length === 0) {
+            await session.commitTransaction();
+
+            return {
+                success: true,
+                message: 'No eligible orders found to confirm and deliver.',
+                deliveredOrders: 0,
+                skippedOrders: totalNonDeletedOrders,
+            };
+        }
+
+        const deliveryTimestamp = new Date();
+
+        for (const order of eligibleOrders) {
+            const oldStatus = order.orderStatus;
+
+            if (!order.stockReduced) {
+                await applyOrderStatusSideEffects({
+                    order,
+                    newStatus: ORDER_STATUSES.CONFIRMED,
+                    session,
+                });
+            }
+
+            order.orderStatus = ORDER_STATUSES.DELIVERED;
+            order.deliveredAt = deliveryTimestamp;
+            order.deliveredBy = actor._id;
+            order.bulkDelivered = true;
+            await order.save({ session });
+
+            await logAudit({
+                actorUserId: actor._id,
+                actorRole: actor.role,
+                action: AUDIT_ACTIONS.ORDER_STATUS_UPDATED,
+                entityType: AUDIT_ENTITY_TYPES.ORDER,
+                entityId: order._id,
+                oldValue: { orderStatus: oldStatus },
+                newValue: {
+                    orderStatus: order.orderStatus,
+                    deliveredAt: order.deliveredAt,
+                    deliveredBy: order.deliveredBy,
+                    bulkDelivered: order.bulkDelivered,
+                },
+                note: 'Bulk confirmed and delivered by Super Admin',
+                session,
+            });
+        }
+
+        await session.commitTransaction();
+
+        return {
+            success: true,
+            message: 'All eligible orders have been confirmed and marked as delivered.',
+            deliveredOrders: eligibleOrders.length,
+            skippedOrders: Math.max(totalNonDeletedOrders - eligibleOrders.length, 0),
+        };
+    } catch (error) {
+        await session.abortTransaction();
+        throw error;
+    } finally {
+        session.endSession();
+    }
+};
+
 export {
     createOrder,
     listMyOrders,
@@ -958,4 +1062,5 @@ export {
     updateOrderStatusByAdmin,
     updatePaymentStatusByAdmin,
     updateAdminNote,
+    confirmAndDeliverAllOrdersBySuperAdmin,
 };

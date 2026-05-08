@@ -1,24 +1,30 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Eye, Filter, RotateCcw } from 'lucide-react';
 import api from '../../utils/api';
+import { useAuth } from '../../context/AuthContext';
 import {
     ORDER_STATUSES,
     PAYMENT_STATUSES,
     formatDate,
     formatMoney,
     getErrorMessage,
+    isSuperAdmin,
     labelize,
     shortId,
     statusTone,
 } from '../../utils/adminUtils';
 
 const AdminOrdersPage = () => {
+    const { userInfo } = useAuth();
+    const canBulkDeliver = isSuperAdmin(userInfo);
     const [searchParams, setSearchParams] = useSearchParams();
     const [orders, setOrders] = useState([]);
     const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0, limit: 20 });
     const [loading, setLoading] = useState(false);
+    const [bulkDelivering, setBulkDelivering] = useState(false);
     const [error, setError] = useState('');
+    const [success, setSuccess] = useState('');
 
     const filters = useMemo(() => ({
         search: searchParams.get('search') || '',
@@ -35,35 +41,35 @@ const AdminOrdersPage = () => {
         setDraft(filters);
     }, [filters]);
 
-    useEffect(() => {
-        const fetchOrders = async () => {
-            setLoading(true);
-            setError('');
+    const fetchOrders = useCallback(async () => {
+        setLoading(true);
+        setError('');
 
-            try {
-                const params = {
-                    page: filters.page,
-                    limit: 20,
-                    search: filters.search || undefined,
-                    status: filters.status || undefined,
-                    paymentStatus: filters.paymentStatus || undefined,
-                    dateFrom: filters.dateFrom ? `${filters.dateFrom}T00:00:00.000Z` : undefined,
-                    dateTo: filters.dateTo ? `${filters.dateTo}T23:59:59.999Z` : undefined,
-                };
-                const { data } = await api.get('/api/orders/admin', { params });
-                setOrders(data.items || []);
-                setPagination(data.pagination || { page: 1, pages: 1, total: 0, limit: 20 });
-            } catch (fetchError) {
-                setOrders([]);
-                setPagination({ page: 1, pages: 1, total: 0, limit: 20 });
-                setError(getErrorMessage(fetchError, 'Failed to load admin orders'));
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchOrders();
+        try {
+            const params = {
+                page: filters.page,
+                limit: 20,
+                search: filters.search || undefined,
+                status: filters.status || undefined,
+                paymentStatus: filters.paymentStatus || undefined,
+                dateFrom: filters.dateFrom ? `${filters.dateFrom}T00:00:00.000Z` : undefined,
+                dateTo: filters.dateTo ? `${filters.dateTo}T23:59:59.999Z` : undefined,
+            };
+            const { data } = await api.get('/api/orders/admin', { params });
+            setOrders(data.items || []);
+            setPagination(data.pagination || { page: 1, pages: 1, total: 0, limit: 20 });
+        } catch (fetchError) {
+            setOrders([]);
+            setPagination({ page: 1, pages: 1, total: 0, limit: 20 });
+            setError(getErrorMessage(fetchError, 'Failed to load admin orders'));
+        } finally {
+            setLoading(false);
+        }
     }, [filters]);
+
+    useEffect(() => {
+        fetchOrders();
+    }, [fetchOrders]);
 
     const applyFilters = (event) => {
         event.preventDefault();
@@ -83,6 +89,40 @@ const AdminOrdersPage = () => {
         const next = new URLSearchParams(searchParams);
         next.set('page', String(page));
         setSearchParams(next);
+    };
+
+    const handleConfirmAndDeliverAll = async () => {
+        if (bulkDelivering) return;
+
+        const confirmed = window.confirm(
+            'Confirm and deliver all eligible orders?\n\n'
+            + 'This will change every Pending, Confirmed, Processing, and Shipped order to Delivered.\n\n'
+            + 'Cancelled, refund-related, failed, and already delivered orders will not be changed.\n\n'
+            + 'Some orders may still be unpaid. Their payment status will not be changed.'
+        );
+
+        if (!confirmed) return;
+
+        setBulkDelivering(true);
+        setError('');
+        setSuccess('');
+
+        try {
+            const { data } = await api.patch('/api/orders/admin/confirm-and-deliver-all');
+            const baseMessage = data?.message || 'All eligible orders have been confirmed and marked as delivered.';
+            const deliveredOrders = Number(data?.deliveredOrders);
+
+            setSuccess(
+                Number.isFinite(deliveredOrders) && deliveredOrders > 0
+                    ? `${baseMessage} Delivered ${deliveredOrders} orders.`
+                    : baseMessage
+            );
+            await fetchOrders();
+        } catch (actionError) {
+            setError(getErrorMessage(actionError, 'Failed to confirm and deliver all orders.'));
+        } finally {
+            setBulkDelivering(false);
+        }
     };
 
     return (
@@ -166,10 +206,21 @@ const AdminOrdersPage = () => {
                         <button type="button" className="admin-icon-button" onClick={resetFilters} aria-label="Reset filters" disabled={loading}>
                             <RotateCcw size={17} />
                         </button>
+                        {canBulkDeliver && (
+                            <button
+                                type="button"
+                                className="admin-button"
+                                onClick={handleConfirmAndDeliverAll}
+                                disabled={loading || bulkDelivering}
+                            >
+                                {bulkDelivering ? 'Delivering...' : 'Confirm & Deliver All'}
+                            </button>
+                        )}
                     </div>
                 </form>
 
                 {error && <div className="admin-message error">{error}</div>}
+                {success && <div className="admin-message success">{success}</div>}
 
                 {loading ? (
                     <div className="admin-empty">Loading orders...</div>

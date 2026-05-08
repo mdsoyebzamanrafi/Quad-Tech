@@ -207,6 +207,15 @@ const orderSchema = new mongoose.Schema(
             type: Date,
             default: null,
         },
+        deliveredBy: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User',
+            default: null,
+        },
+        bulkDelivered: {
+            type: Boolean,
+            default: false,
+        },
         cancelledAt: {
             type: Date,
             default: null,
