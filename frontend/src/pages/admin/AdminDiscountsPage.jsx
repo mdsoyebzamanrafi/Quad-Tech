@@ -7,7 +7,8 @@ import {
     toggleDiscountRule,
     updateDiscountRule,
 } from '../../services/discountService';
-import { formatDateTime, formatMoney, getErrorMessage, labelize } from '../../utils/adminUtils';
+import { useCurrency } from '../../context/CurrencyContext';
+import { formatDateTime, getErrorMessage, labelize } from '../../utils/adminUtils';
 
 const createEmptyForm = () => ({
     name: '',
@@ -56,12 +57,12 @@ const buildPayload = (form) => ({
     active: Boolean(form.active),
 });
 
-const getConditionChips = (rule) => {
+const getConditionChips = (rule, formatCurrency) => {
     const conditions = rule?.conditions || {};
     const chips = [];
 
     if (conditions.minCartTotal !== null && conditions.minCartTotal !== undefined) {
-        chips.push(`Min cart ${formatMoney(conditions.minCartTotal)}`);
+        chips.push(`Min cart ${formatCurrency(conditions.minCartTotal)}`);
     }
     if (conditions.minOrderCount !== null && conditions.minOrderCount !== undefined) {
         chips.push(`Min orders ${conditions.minOrderCount}`);
@@ -96,6 +97,7 @@ const getWindowLabel = (rule) => {
 };
 
 const AdminDiscountsPage = () => {
+    const { formatCurrency } = useCurrency();
     const [rules, setRules] = useState([]);
     const [form, setForm] = useState(createEmptyForm());
     const [loading, setLoading] = useState(true);
@@ -372,15 +374,15 @@ const AdminDiscountsPage = () => {
                                             <div className="admin-strong">
                                                 {rule.discountType === 'percentage'
                                                     ? `${rule.discountValue}%`
-                                                    : formatMoney(rule.discountValue)}
+                                                    : formatCurrency(rule.discountValue)}
                                             </div>
                                             <div className="admin-muted" style={{ marginTop: '0.35rem' }}>
-                                                {rule.maxDiscountAmount ? `Cap ${formatMoney(rule.maxDiscountAmount)}` : 'No cap'}
+                                                {rule.maxDiscountAmount ? `Cap ${formatCurrency(rule.maxDiscountAmount)}` : 'No cap'}
                                             </div>
                                         </td>
                                         <td>
                                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem' }}>
-                                                {getConditionChips(rule).map((chip) => (
+                                                {getConditionChips(rule, formatCurrency).map((chip) => (
                                                     <span key={`${rule._id}-${chip}`} className="admin-pill">
                                                         {chip}
                                                     </span>

@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { ShoppingBag, X, ArrowRight, Tag } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
+import { useCurrency } from '../context/CurrencyContext';
 import api from '../utils/api';
 import { getEligibleSmartDiscount } from '../services/discountService';
 import '../styles/CartPage.css';
@@ -25,6 +26,7 @@ const CartPage = () => {
         removeCoupon,
     } = useCart();
     const { userInfo } = useAuth();
+    const { formatCurrency } = useCurrency();
     const navigate = useNavigate();
 
     const [couponInput, setCouponInput] = useState(couponCode || '');
@@ -181,7 +183,7 @@ const CartPage = () => {
                                         {getProductOptionSummary(item) && (
                                             <div className="cart-item-price">{getProductOptionSummary(item)}</div>
                                         )}
-                                        <div className="cart-item-price">${item.price.toFixed(2)}</div>
+                                        <div className="cart-item-price">{formatCurrency(item.price)}</div>
                                     </div>
 
                                     <div className="cart-item-actions">
@@ -223,7 +225,7 @@ const CartPage = () => {
 
                                 <div className="summary-row">
                                     <span>Items ({itemsCount})</span>
-                                    <span>${addDecimals(itemsPriceNumber)}</span>
+                                    <span>{formatCurrency(itemsPriceNumber)}</span>
                                 </div>
 
                                 <div className="summary-row">
@@ -273,7 +275,7 @@ const CartPage = () => {
                                             </div>
                                             <div className="summary-row coupon-discount-row">
                                                 <span>Coupon Discount</span>
-                                                <span>- ${addDecimals(safeCouponDiscount)}</span>
+                                                <span>- {formatCurrency(safeCouponDiscount)}</span>
                                             </div>
                                         </div>
                                     )}
@@ -296,7 +298,7 @@ const CartPage = () => {
                                 <div className="summary-row total-row">
                                     <span>Total</span>
                                     <span className="text-gradient">
-                                        ${addDecimals(displayedTotal)}
+                                        {formatCurrency(displayedTotal)}
                                     </span>
                                 </div>
 

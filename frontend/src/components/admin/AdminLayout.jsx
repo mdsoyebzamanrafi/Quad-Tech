@@ -59,6 +59,19 @@ const AdminLayout = () => {
                         Role management enabled
                     </div>
                 )}
+                
+                <div style={{ marginTop: 'auto', padding: '1rem' }}>
+                    <button 
+                        className="btn btn-outline" 
+                        style={{ width: '100%' }}
+                        onClick={() => {
+                            localStorage.setItem('adminViewMode', 'customer');
+                            window.location.href = '/';
+                        }}
+                    >
+                        View as Customer
+                    </button>
+                </div>
             </aside>
 
             <div className="admin-content">

@@ -41,6 +41,35 @@ const protect = asyncHandler(async (req, res, next) => {
     next();
 });
 
+const protectOptional = asyncHandler(async (req, res, next) => {
+    let token;
+
+    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+        token = req.headers.authorization.split(' ')[1];
+    }
+
+    if (!token) {
+        next();
+        return;
+    }
+
+    try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        const user = await User.findById(decoded.userId).select('-password -resetPasswordToken -resetPasswordExpire');
+
+        if (!user || AUTH_BLOCKED_STATUS_SET.has(user.status) || user.deletedAt) {
+            next();
+            return;
+        }
+
+        req.user = user;
+    } catch (error) {
+        req.user = undefined;
+    }
+
+    next();
+});
+
 const requireRoles = (...roles) => (req, res, next) => {
     if (!req.user) {
         throw new ApiError(401, 'Not authorized');
@@ -90,4 +119,4 @@ const requireActiveSuperAdmin = (req, res, next) => {
 
 const admin = requireActiveAdmin;
 
-export { protect, admin, requireRoles, requireActiveAdmin, requireActiveSuperAdmin };
+export { protect, protectOptional, admin, requireRoles, requireActiveAdmin, requireActiveSuperAdmin };

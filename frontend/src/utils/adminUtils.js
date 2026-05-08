@@ -31,15 +31,6 @@ export const labelize = (value) => {
         .replace(/\b\w/g, (char) => char.toUpperCase());
 };
 
-export const formatMoney = (value) => {
-    const number = Number(value ?? 0);
-    if (!Number.isFinite(number)) return '$0.00';
-
-    return new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: 'USD',
-    }).format(number);
-};
 
 const parseValidDate = (value) => {
     if (!value) return null;

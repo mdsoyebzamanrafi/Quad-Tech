@@ -33,3 +33,5 @@ Quad-Tech/
 *.njsproj
 *.sln
 *.sw?
+backend/.env
+backend/.env

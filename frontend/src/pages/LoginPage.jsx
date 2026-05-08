@@ -22,7 +22,13 @@ const LoginPage = () => {
 
     useEffect(() => {
         if (userInfo) {
-            navigate(redirect);
+            const isAdmin = userInfo.role === 'admin' || userInfo.role === 'super_admin';
+            const viewMode = localStorage.getItem('adminViewMode');
+            if (isAdmin && viewMode !== 'customer') {
+                navigate('/admin');
+            } else {
+                navigate(redirect);
+            }
         }
     }, [navigate, userInfo, redirect]);
 

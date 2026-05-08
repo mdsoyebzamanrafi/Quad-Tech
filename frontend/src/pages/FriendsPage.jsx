@@ -155,8 +155,8 @@ const FriendsPage = () => {
                                             <button className="btn btn-primary" onClick={() => handleRequest(req.friendshipId, 'accept')} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                                 <Check size={16} /> Accept
                                             </button>
-                                            <button className="btn btn-secondary" onClick={() => handleRequest(req.friendshipId, 'reject')} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--error)' }}>
-                                                <X size={16} /> Reject
+                                            <button className="btn btn-outline" onClick={() => handleRequest(req.friendshipId, 'reject')} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', borderColor: 'var(--error)', color: 'var(--error)' }}>
+                                                <X size={16} /> Decline
                                             </button>
                                         </div>
                                     </div>

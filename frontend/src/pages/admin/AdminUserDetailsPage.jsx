@@ -1,3 +1,4 @@
+import { useCurrency } from '../../context/CurrencyContext';
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft, Save, Trash2 } from 'lucide-react';
@@ -7,7 +8,6 @@ import {
     EDITABLE_USER_STATUSES,
     USER_ROLES,
     formatDateTime,
-    formatMoney,
     getErrorMessage,
     isSuperAdmin,
     labelize,
@@ -16,6 +16,7 @@ import {
 } from '../../utils/adminUtils';
 
 const AdminUserDetailsPage = () => {
+    const { formatCurrency } = useCurrency();
     const { id } = useParams();
     const { userInfo } = useAuth();
     const canManageRoles = isSuperAdmin(userInfo);
@@ -200,7 +201,7 @@ const AdminUserDetailsPage = () => {
                     <h3>Order Summary</h3>
                     <div className="admin-detail-list">
                         <div className="admin-detail-row"><span>Total orders</span><strong>{orderSummary?.totalOrders || 0}</strong></div>
-                        <div className="admin-detail-row"><span>Total spent</span><strong>{formatMoney(orderSummary?.totalSpent)}</strong></div>
+                        <div className="admin-detail-row"><span>Total spent</span><strong>{formatCurrency(orderSummary?.totalSpent)}</strong></div>
                         <div className="admin-detail-row"><span>Last order</span><strong>{formatDateTime(orderSummary?.lastOrderAt)}</strong></div>
                     </div>
                 </div>
@@ -308,7 +309,7 @@ const AdminUserDetailsPage = () => {
                                         </td>
                                         <td><span className={`admin-pill ${statusTone(order.orderStatus)}`}>{labelize(order.orderStatus)}</span></td>
                                         <td><span className={`admin-pill ${statusTone(order.paymentStatus)}`}>{labelize(order.paymentStatus)}</span></td>
-                                        <td>{formatMoney(order.total)}</td>
+                                        <td>{formatCurrency(order.total)}</td>
                                         <td>{formatDateTime(order.createdAt)}</td>
                                     </tr>
                                 ))}

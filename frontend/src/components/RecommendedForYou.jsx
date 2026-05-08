@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { ArrowRight, ShoppingCart, Sparkles, Star } from 'lucide-react';
 import api from '../utils/api';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
+import { useCurrency } from '../context/CurrencyContext';
 import {
     buildFashionMetaLine,
     getDepartmentLabel,
@@ -18,7 +19,7 @@ const buildMatchPercent = (finalScore) =>
 
 const formatItemCount = (count) => `${count} ${Number(count) === 1 ? 'item' : 'items'}`;
 
-const toSummaryEntries = (contextSummary) => {
+const toSummaryEntries = (contextSummary, formatCurrencyFn) => {
     if (!contextSummary) {
         return [];
     }
@@ -53,7 +54,7 @@ const toSummaryEntries = (contextSummary) => {
     if (contextSummary.averagePrice) {
         entries.push({
             label: 'Avg Price',
-            value: `$${Number(contextSummary.averagePrice).toLocaleString()}`,
+            value: formatCurrencyFn(contextSummary.averagePrice),
         });
     }
 
@@ -61,8 +62,10 @@ const toSummaryEntries = (contextSummary) => {
 };
 
 const RecommendedForYou = ({ variant = 'section' }) => {
+    const navigate = useNavigate();
     const { userInfo } = useAuth();
     const { addToCart } = useCart();
+    const { formatCurrency } = useCurrency();
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [recommendations, setRecommendations] = useState([]);
@@ -117,7 +120,7 @@ const RecommendedForYou = ({ variant = 'section' }) => {
         };
     }, [userInfo]);
 
-    const summaryEntries = useMemo(() => toSummaryEntries(contextSummary), [contextSummary]);
+    const summaryEntries = useMemo(() => toSummaryEntries(contextSummary, formatCurrency), [contextSummary, formatCurrency]);
     const isPageVariant = variant === 'page';
 
     if (!userInfo) {
@@ -226,7 +229,16 @@ const RecommendedForYou = ({ variant = 'section' }) => {
                             : [];
 
                         return (
-                            <article key={product._id} className="recommended-card">
+                            <article 
+                                key={product._id} 
+                                className="recommended-card"
+                                onClick={(e) => {
+                                    if (!e.target.closest('button')) {
+                                        navigate(`/product/${product._id}`);
+                                    }
+                                }}
+                                style={{ cursor: 'pointer' }}
+                            >
                                 <div className="recommended-image-wrap">
                                     <span className={`recommended-department-badge badge-${department}`}>
                                         {getDepartmentLabel(department)}
@@ -276,17 +288,11 @@ const RecommendedForYou = ({ variant = 'section' }) => {
                                     <div className="recommended-footer">
                                         <div>
                                             <p className="recommended-price">
-                                                ${Number(product.price || 0).toLocaleString()}
+                                                {formatCurrency(product.price)}
                                             </p>
                                         </div>
 
                                         <div className="recommended-actions">
-                                            <Link
-                                                to={`/product/${product._id}`}
-                                                className="btn btn-outline recommended-card-btn"
-                                            >
-                                                View Details
-                                            </Link>
                                             <button
                                                 type="button"
                                                 className="btn btn-primary recommended-card-btn"

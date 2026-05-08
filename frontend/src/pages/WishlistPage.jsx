@@ -3,11 +3,13 @@ import { Link } from 'react-router-dom';
 import { Heart, Trash2, ShoppingCart } from 'lucide-react';
 import api from '../utils/api';
 import { useCart } from '../context/CartContext';
+import { useCurrency } from '../context/CurrencyContext';
 import '../styles/HomePage.css';
 
 const WishlistPage = () => {
     const [wishlistItems, setWishlistItems] = useState([]);
     const [loading, setLoading] = useState(true);
+    const { formatCurrency } = useCurrency();
     const { addToCart } = useCart();
 
     useEffect(() => {
@@ -85,7 +87,7 @@ const WishlistPage = () => {
                                         <h3 style={{ marginBottom: '0.5rem' }}>{product.name}</h3>
                                     </Link>
                                     <div className="product-card-footer" style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: '1rem', alignItems: 'stretch' }}>
-                                        <p className="price" style={{ margin: 0 }}>${Number(product.price || 0).toFixed(2)}</p>
+                                        <p className="price" style={{ margin: 0 }}>{formatCurrency(product.price)}</p>
                                         <button 
                                             className="btn btn-secondary" 
                                             style={{ width: '100%', display: 'flex', justifyContent: 'center', gap: '0.5rem' }}

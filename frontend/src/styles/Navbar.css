@@ -12,6 +12,8 @@
     justify-content: space-between;
     padding: 1.25rem 2rem;
     height: 80px;
+    width: 95%;
+    margin: 0 auto;
 }
 
 .logo h2 {
@@ -139,6 +141,7 @@
     font-weight: 500;
     font-size: 1rem;
     transition: color 0.2s ease;
+    white-space: nowrap;
 }
 
 .nav-item:hover {
@@ -254,22 +257,22 @@
 .categories-sidebar {
     position: fixed;
     top: 0;
-    left: -340px;
+    left: -380px;
     width: 340px;
     height: 100vh;
     background: var(--bg-primary);
     z-index: 2001;
-    transition: left 0.4s cubic-bezier(0.25, 1, 0.5, 1);
-    box-shadow: 10px 0 30px rgba(0, 0, 0, 0.1);
+    transition: left 0.4s cubic-bezier(0.25, 1, 0.5, 1), box-shadow 0.4s ease;
     display: flex;
     flex-direction: column;
 }
 
 .categories-sidebar.open {
     left: 0;
+    box-shadow: 10px 0 30px rgba(0, 0, 0, 0.1);
 }
 
-.dark .categories-sidebar {
+.dark .categories-sidebar.open {
     box-shadow: 10px 0 30px rgba(0, 0, 0, 0.5);
 }
 
@@ -363,6 +366,7 @@
     display: flex;
     align-items: center;
     gap: 0.5rem;
+    white-space: nowrap;
 }
 
 .dropdown-menu {

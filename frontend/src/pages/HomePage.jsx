@@ -5,7 +5,9 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import '../styles/HomePage.css';
 import api from '../utils/api';
 import { DEPARTMENT_OPTIONS } from '../utils/catalog';
+import ImageProductSearch from '../components/ImageProductSearch';
 import RecommendedForYou from '../components/RecommendedForYou';
+import { useCurrency } from '../context/CurrencyContext';
 import {
     buildFashionMetaLine,
     getDepartmentLabel,
@@ -60,6 +62,14 @@ const HomePage = () => {
     const [keyword, setKeyword] = useState('');
     const [filters, setFilters] = useState(DEFAULT_FILTERS);
     const [isLandingView, setIsLandingView] = useState(true);
+    const [imageSearchFile, setImageSearchFile] = useState(null);
+    const [imageSearchPreview, setImageSearchPreview] = useState('');
+    const [imageSearchLoading, setImageSearchLoading] = useState(false);
+    const [imageSearchError, setImageSearchError] = useState('');
+    const [imageSearchResult, setImageSearchResult] = useState(null);
+    const [imageSearchActive, setImageSearchActive] = useState(false);
+
+    const { formatCurrency } = useCurrency();
 
     const navigate = useNavigate();
     const location = useLocation();
@@ -94,6 +104,18 @@ const HomePage = () => {
 
         fetchProducts();
     }, []);
+
+    useEffect(() => {
+        if (!imageSearchFile) {
+            setImageSearchPreview('');
+            return undefined;
+        }
+
+        const previewUrl = URL.createObjectURL(imageSearchFile);
+        setImageSearchPreview(previewUrl);
+
+        return () => URL.revokeObjectURL(previewUrl);
+    }, [imageSearchFile]);
 
     useEffect(() => {
         const params = new URLSearchParams(location.search);
@@ -132,6 +154,18 @@ const HomePage = () => {
                 styleTags: normalizeStringList(product.styleTags),
             })),
         [allProducts]
+    );
+
+    const imageSearchProducts = useMemo(
+        () =>
+            (Array.isArray(imageSearchResult?.products) ? imageSearchResult.products : []).map((product) => ({
+                ...product,
+                department: normalizeDepartment(product.department),
+                colors: normalizeStringList(product.colors),
+                sizes: normalizeStringList(product.sizes),
+                styleTags: normalizeStringList(product.styleTags),
+            })),
+        [imageSearchResult]
     );
 
     const productsForSelectedDepartment = useMemo(() => {
@@ -219,6 +253,10 @@ const HomePage = () => {
     );
 
     const displayedProducts = useMemo(() => {
+        if (imageSearchActive) {
+            return imageSearchProducts;
+        }
+
         let filteredProducts = [...normalizedProducts];
 
         if (keyword) {
@@ -313,9 +351,13 @@ const HomePage = () => {
         }
 
         return filteredProducts;
-    }, [filters, hasFiltersApplied, isLandingView, keyword, normalizedProducts]);
+    }, [filters, hasFiltersApplied, imageSearchActive, imageSearchProducts, isLandingView, keyword, normalizedProducts]);
 
     const sectionTitle = useMemo(() => {
+        if (imageSearchActive) {
+            return 'Image search results';
+        }
+
         if (keyword) {
             return `Results for "${keyword}"`;
         }
@@ -337,7 +379,81 @@ const HomePage = () => {
         }
 
         return 'All Products';
-    }, [filters.category, filters.department, hasFiltersApplied, isLandingView, keyword]);
+    }, [filters.category, filters.department, hasFiltersApplied, imageSearchActive, isLandingView, keyword]);
+
+    const handleImageSearchFileChange = (event) => {
+        const file = event.target.files?.[0] || null;
+
+        if (!file) {
+            setImageSearchFile(null);
+            return;
+        }
+
+        const allowedTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
+        if (!allowedTypes.has(file.type)) {
+            setImageSearchError('Only JPEG, PNG, or WebP images are allowed.');
+            setImageSearchFile(null);
+            setImageSearchResult(null);
+            setImageSearchActive(false);
+            return;
+        }
+
+        if (file.size > 5 * 1024 * 1024) {
+            setImageSearchError('Image must be 5MB or less.');
+            setImageSearchFile(null);
+            setImageSearchResult(null);
+            setImageSearchActive(false);
+            return;
+        }
+
+        setImageSearchError('');
+        setImageSearchFile(file);
+        setImageSearchResult(null);
+        setImageSearchActive(false);
+    };
+
+    const handleClearImageSearch = () => {
+        setImageSearchFile(null);
+        setImageSearchPreview('');
+        setImageSearchLoading(false);
+        setImageSearchError('');
+        setImageSearchResult(null);
+        setImageSearchActive(false);
+    };
+
+    const handleSubmitImageSearch = async () => {
+        if (!imageSearchFile || imageSearchLoading) {
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('image', imageSearchFile);
+
+        try {
+            setImageSearchLoading(true);
+            setImageSearchError('');
+
+            const { data } = await api.post('/api/recommendations/image-search', formData);
+
+            setImageSearchResult(data);
+            setImageSearchActive(true);
+            setIsLandingView(false);
+
+            window.setTimeout(() => {
+                document
+                    .getElementById('product-display-section')
+                    ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }, 50);
+        } catch (requestError) {
+            setImageSearchResult(null);
+            setImageSearchActive(false);
+            setImageSearchError(
+                requestError.response?.data?.message || 'Could not analyze that image right now.'
+            );
+        } finally {
+            setImageSearchLoading(false);
+        }
+    };
 
     const updateFilter = (key, value) => {
         setIsLandingView(false);
@@ -482,10 +598,26 @@ const HomePage = () => {
                 <FadeInSection>
                     <div className="section-header">
                         <h2>{sectionTitle}</h2>
-                        <p>Browse the full mix of electronics and fashion with safe optional filters.</p>
+                        <p>
+                            {imageSearchActive
+                                ? imageSearchResult?.message || 'Found products similar to your image.'
+                                : 'Browse the full mix of electronics and fashion with safe optional filters.'}
+                        </p>
                     </div>
 
                     <div className="marketplace-filter-panel glass">
+                        <ImageProductSearch
+                            imageSearchFile={imageSearchFile}
+                            imageSearchPreview={imageSearchPreview}
+                            imageSearchLoading={imageSearchLoading}
+                            imageSearchError={imageSearchError}
+                            imageSearchResult={imageSearchResult}
+                            imageSearchActive={imageSearchActive}
+                            onFileChange={handleImageSearchFileChange}
+                            onSubmit={handleSubmitImageSearch}
+                            onClear={handleClearImageSearch}
+                        />
+
                         <div className="department-pill-row">
                             {DEPARTMENT_OPTIONS.map((option) => (
                                 <button
@@ -710,7 +842,7 @@ const HomePage = () => {
                                                 <p className="fashion-meta-line">{fashionMeta}</p>
                                             )}
                                             <div className="product-card-footer">
-                                                <p className="price">${Number(product.price || 0).toFixed(2)}</p>
+                                                <p className="price">{formatCurrency(product.price)}</p>
                                                 <span
                                                     className={`stock-pill ${
                                                         stockLabel === 'Out of Stock'
@@ -736,13 +868,19 @@ const HomePage = () => {
                             <div className="no-results-icon" style={{ marginBottom: '1.5rem', opacity: 0.5 }}>
                                 <Search size={64} />
                             </div>
-                            <h2 style={{ fontSize: '2rem', marginBottom: '1rem' }}>No results found</h2>
+                            <h2 style={{ fontSize: '2rem', marginBottom: '1rem' }}>
+                                {imageSearchActive ? 'No similar products found' : 'No results found'}
+                            </h2>
                             <p style={{ color: 'var(--text-muted)', marginBottom: '2rem' }}>
-                                No products matched the current search or filters. Try another department,
-                                category, or fashion attribute.
+                                {imageSearchActive
+                                    ? 'We could not find products close to this image right now. Try a clearer photo or remove image search to browse normally.'
+                                    : 'No products matched the current search or filters. Try another department, category, or fashion attribute.'}
                             </p>
-                            <button className="btn btn-outline" onClick={resetFilters}>
-                                Clear Filters
+                            <button
+                                className="btn btn-outline"
+                                onClick={imageSearchActive ? handleClearImageSearch : resetFilters}
+                            >
+                                {imageSearchActive ? 'Clear Image Search' : 'Clear Filters'}
                             </button>
                         </div>
                     )}

@@ -1,4 +1,4 @@
-import Product from '../models/Product.js';
+import { getProductAttributeValues } from './productAttributeValueService.js';
 
 const DEFAULT_INTENT = Object.freeze({
     department: null,
@@ -34,25 +34,6 @@ const logOllamaDebug = (...args) => {
         console.log(...args);
     }
 };
-
-const flattenValues = (values) =>
-    values.flatMap((value) => {
-        if (Array.isArray(value)) {
-            return flattenValues(value);
-        }
-
-        return [value];
-    });
-
-const cleanDistinctValues = (values) =>
-    Array.from(
-        new Set(
-            flattenValues(values)
-                .filter((value) => typeof value === 'string')
-                .map((value) => value.trim())
-                .filter(Boolean)
-        )
-    ).sort((first, second) => first.localeCompare(second));
 
 const normalizeComparable = (value) =>
     String(value || '')
@@ -585,50 +566,7 @@ const parseWithOllama = async (prompt, validValues) => {
     }
 };
 
-const getProductValidValues = async () => {
-    const [
-        departments,
-        categories,
-        brands,
-        genders,
-        colors,
-        sizes,
-        materials,
-        fits,
-        occasions,
-        seasons,
-        styleTags,
-        productTypes,
-    ] = await Promise.all([
-        Product.distinct('department'),
-        Product.distinct('category'),
-        Product.distinct('brand'),
-        Product.distinct('gender'),
-        Product.distinct('colors'),
-        Product.distinct('sizes'),
-        Product.distinct('material'),
-        Product.distinct('fit'),
-        Product.distinct('occasion'),
-        Product.distinct('season'),
-        Product.distinct('styleTags'),
-        Product.distinct('productType'),
-    ]);
-
-    return {
-        departments: cleanDistinctValues(departments),
-        categories: cleanDistinctValues(categories),
-        brands: cleanDistinctValues(brands),
-        genders: cleanDistinctValues(genders),
-        colors: cleanDistinctValues(colors),
-        sizes: cleanDistinctValues(sizes),
-        materials: cleanDistinctValues(materials),
-        fits: cleanDistinctValues(fits),
-        occasions: cleanDistinctValues(occasions),
-        seasons: cleanDistinctValues(seasons),
-        styleTags: cleanDistinctValues(styleTags),
-        productTypes: cleanDistinctValues(productTypes),
-    };
-};
+const getProductValidValues = async () => getProductAttributeValues();
 
 const parseRecommendationIntent = async (prompt) => {
     const validValues = await getProductValidValues();
