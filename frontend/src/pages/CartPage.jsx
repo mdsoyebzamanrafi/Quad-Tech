@@ -79,7 +79,7 @@ const CartPage = () => {
                 if (!cancelled) {
                     setSmartDiscount(data?.eligible ? data : emptySmartDiscount);
                 }
-            } catch (error) {
+            } catch {
                 if (!cancelled) {
                     setSmartDiscount(emptySmartDiscount);
                 }

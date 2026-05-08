@@ -153,7 +153,7 @@ const PlaceOrderPage = () => {
                 if (!cancelled) {
                     setSmartDiscount(data?.eligible ? data : emptySmartDiscount);
                 }
-            } catch (error) {
+            } catch {
                 if (!cancelled) {
                     setSmartDiscount(emptySmartDiscount);
                 }

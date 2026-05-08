@@ -5,7 +5,7 @@ import { MapPin, Truck } from 'lucide-react';
 import '../styles/LoginPage.css';
 
 const ShippingPage = () => {
-    const { cartItems, saveShippingAddress, savePaymentMethod } = useCart();
+    const { saveShippingAddress, savePaymentMethod } = useCart();
 
     // Fallbacks just in case context isn't fully structured yet
     const storedAddress = JSON.parse(localStorage.getItem('shippingAddress')) || {};

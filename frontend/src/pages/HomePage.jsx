@@ -76,7 +76,7 @@ const HomePage = () => {
         try {
             await api.post('/api/wishlist', { productId });
             alert('Added to wishlist!');
-        } catch (error) {
+        } catch {
             alert('Please login to add to wishlist');
         }
     };
