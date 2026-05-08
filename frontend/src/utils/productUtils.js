@@ -27,18 +27,57 @@ export const getProductImages = (product) => {
     return Array.from(new Set(fallbackGallery.filter(Boolean)));
 };
 
-export const buildCartItemKey = (productId, selectedColor = '', selectedSize = '') =>
-    [productId, selectedColor.trim(), selectedSize.trim()].join('::');
+export const getCustomDesignKey = (customDesign) => {
+    if (!customDesign || typeof customDesign !== 'object') {
+        return '';
+    }
+
+    if (typeof customDesign.designId === 'string' && customDesign.designId.trim()) {
+        return customDesign.designId.trim();
+    }
+
+    const designSignature = {
+        shirtColor: customDesign.shirtColor || '',
+        templateId: customDesign.templateId || '',
+        designs: Array.isArray(customDesign.designs)
+            ? customDesign.designs.map(({ assetId, x, y, width, height, rotation, zIndex }) => ({
+                assetId,
+                x,
+                y,
+                width,
+                height,
+                rotation,
+                zIndex,
+            }))
+            : [],
+    };
+
+    return JSON.stringify(designSignature);
+};
+
+export const buildCartItemKey = (productId, selectedColor = '', selectedSize = '', customDesign = null) => {
+    const baseParts = [productId, selectedColor.trim(), selectedSize.trim()];
+    const customDesignKey = getCustomDesignKey(customDesign);
+
+    return customDesignKey ? [...baseParts, customDesignKey].join('::') : baseParts.join('::');
+};
 
 export const getProductOptionSummary = (item) => {
     const parts = [];
 
-    if (typeof item?.selectedColor === 'string' && item.selectedColor.trim()) {
+    if (item?.customDesign?.shirtColor) {
+        parts.push(`Custom Color: ${item.customDesign.shirtColor}`);
+    } else if (typeof item?.selectedColor === 'string' && item.selectedColor.trim()) {
         parts.push(`Color: ${item.selectedColor.trim()}`);
     }
 
     if (typeof item?.selectedSize === 'string' && item.selectedSize.trim()) {
         parts.push(`Size: ${item.selectedSize.trim()}`);
+    }
+
+    if (item?.customDesign) {
+        const designCount = Array.isArray(item.customDesign.designs) ? item.customDesign.designs.length : 0;
+        parts.push(`${designCount} custom design${designCount === 1 ? '' : 's'}`);
     }
 
     return parts.join(' | ');

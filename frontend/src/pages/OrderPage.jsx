@@ -86,7 +86,7 @@ const OrderPage = () => {
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                             {(order.orderItems || []).map((item) => (
                                 <div key={item._id || item.product} style={{ display: 'flex', gap: '1rem', alignItems: 'center', paddingBottom: '1rem', borderBottom: '1px solid var(--border-color)' }}>
-                                    <img src={item.image} alt={item.name} style={{ width: '64px', borderRadius: '10px' }} />
+                                    <img src={item.customDesign?.previewImageUrl || item.image} alt={item.name} style={{ width: '64px', borderRadius: '10px' }} />
                                     <div style={{ flex: 1 }}>
                                         <div style={{ color: 'var(--text-main)', fontWeight: 600 }}>{item.name}</div>
                                         {getProductOptionSummary(item) && (

@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft, Save } from 'lucide-react';
 import api from '../../utils/api';
+import { getProductOptionSummary } from '../../utils/productUtils';
 import {
     ORDER_STATUSES,
     PAYMENT_STATUSES,
@@ -210,8 +211,26 @@ const AdminOrderDetailsPage = () => {
                             {(order.orderItems || []).map((item) => (
                                 <tr key={item._id || item.product}>
                                     <td>
-                                        <div className="admin-strong">{item.name || item.productName}</div>
-                                        <div className="admin-muted">{shortId(item.productId || item.product)}</div>
+                                        <div className="admin-order-item-cell">
+                                            <img
+                                                src={item.customDesign?.previewImageUrl || item.image}
+                                                alt={item.name || item.productName}
+                                                className="admin-order-item-preview"
+                                            />
+                                            <div>
+                                                <div className="admin-strong">{item.name || item.productName}</div>
+                                                <div className="admin-muted">{shortId(item.productId || item.product)}</div>
+                                                {getProductOptionSummary(item) && (
+                                                    <div className="admin-muted">{getProductOptionSummary(item)}</div>
+                                                )}
+                                                {item.customDesign && (
+                                                    <details className="admin-custom-design-details">
+                                                        <summary>Custom design data</summary>
+                                                        <pre className="admin-code">{JSON.stringify(item.customDesign, null, 2)}</pre>
+                                                    </details>
+                                                )}
+                                            </div>
+                                        </div>
                                     </td>
                                     <td>{item.qty || item.quantity}</td>
                                     <td>{formatMoney(item.price ?? item.unitPrice)}</td>

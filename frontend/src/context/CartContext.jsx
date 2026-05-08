@@ -17,14 +17,16 @@ const emptyDiscountState = {
 const normalizeCartItem = (item) => {
     const selectedColor = typeof item?.selectedColor === 'string' ? item.selectedColor.trim() : '';
     const selectedSize = typeof item?.selectedSize === 'string' ? item.selectedSize.trim() : '';
+    const customDesign = item?.customDesign && typeof item.customDesign === 'object' ? item.customDesign : null;
 
     return {
         ...item,
         selectedColor,
         selectedSize,
+        customDesign,
         cartItemKey:
             item?.cartItemKey ||
-            buildCartItemKey(item?.product || '', selectedColor, selectedSize),
+            buildCartItemKey(item?.product || '', selectedColor, selectedSize, customDesign),
     };
 };
 
@@ -157,18 +159,23 @@ export const CartProvider = ({ children }) => {
                 typeof options.selectedColor === 'string' ? options.selectedColor.trim() : '';
             const selectedSize =
                 typeof options.selectedSize === 'string' ? options.selectedSize.trim() : '';
+            const customDesign =
+                options.customDesign && typeof options.customDesign === 'object'
+                    ? options.customDesign
+                    : null;
 
             dispatch({
                 type: 'CART_ADD_ITEM',
                 payload: {
                     product: data._id,
-                    cartItemKey: buildCartItemKey(data._id, selectedColor, selectedSize),
+                    cartItemKey: buildCartItemKey(data._id, selectedColor, selectedSize, customDesign),
                     name: data.name,
                     image: data.image,
                     price: data.price,
                     countInStock: data.countInStock,
                     selectedColor,
                     selectedSize,
+                    customDesign,
                     qty,
                 },
             });

@@ -1,5 +1,84 @@
 import mongoose from 'mongoose';
 
+const customDesignPlacementSchema = new mongoose.Schema(
+    {
+        assetId: {
+            type: String,
+            trim: true,
+            default: '',
+        },
+        imagePath: {
+            type: String,
+            trim: true,
+            default: '',
+        },
+        x: {
+            type: Number,
+            default: 0,
+        },
+        y: {
+            type: Number,
+            default: 0,
+        },
+        width: {
+            type: Number,
+            default: 0,
+        },
+        height: {
+            type: Number,
+            default: 0,
+        },
+        rotation: {
+            type: Number,
+            default: 0,
+        },
+        zIndex: {
+            type: Number,
+            default: 0,
+        },
+    },
+    { _id: false }
+);
+
+const customDesignSchema = new mongoose.Schema(
+    {
+        designId: {
+            type: String,
+            trim: true,
+            default: '',
+        },
+        shirtColor: {
+            type: String,
+            trim: true,
+            default: '',
+        },
+        templateId: {
+            type: String,
+            trim: true,
+            default: '',
+        },
+        templatePath: {
+            type: String,
+            trim: true,
+            default: '',
+        },
+        previewImageUrl: {
+            type: String,
+            default: '',
+        },
+        previewImagePublicId: {
+            type: String,
+            trim: true,
+            default: '',
+        },
+        designs: {
+            type: [customDesignPlacementSchema],
+            default: [],
+        },
+    },
+    { _id: false }
+);
+
 const orderItemSchema = new mongoose.Schema(
     {
         order: {
@@ -48,13 +127,20 @@ const orderItemSchema = new mongoose.Schema(
             required: true,
             min: 0,
         },
+        customDesign: {
+            type: customDesignSchema,
+            default: null,
+        },
     },
     {
         timestamps: true,
     }
 );
 
-orderItemSchema.index({ order: 1, product: 1, selectedColor: 1, selectedSize: 1 }, { unique: true });
+orderItemSchema.index(
+    { order: 1, product: 1, selectedColor: 1, selectedSize: 1, 'customDesign.designId': 1 },
+    { unique: true }
+);
 
 const OrderItem = mongoose.model('OrderItem', orderItemSchema);
 

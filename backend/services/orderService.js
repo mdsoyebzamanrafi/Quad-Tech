@@ -39,6 +39,20 @@ import {
 
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const REWARD_TOKEN_RATE = Number(process.env.REWARD_TOKEN_RATE ?? 5);
+const MAX_TRANSACTION_ATTEMPTS = 3;
+
+const isTransientTransactionError = (error) => {
+    if (typeof error?.hasErrorLabel === 'function' && error.hasErrorLabel('TransientTransactionError')) {
+        return true;
+    }
+
+    if (error?.errorLabelSet?.has?.('TransientTransactionError')) {
+        return true;
+    }
+
+    return Array.isArray(error?.errorResponse?.errorLabels) &&
+        error.errorResponse.errorLabels.includes('TransientTransactionError');
+};
 
 const buildPaymentStatusFromMethod = (paymentMethod) => {
     if (paymentMethod === PAYMENT_METHODS.CASH_ON_DELIVERY || paymentMethod === PAYMENT_METHODS.PLACEHOLDER) {
@@ -57,6 +71,7 @@ const formatOrderItemForResponse = (item) => ({
     image: item.productImage,
     selectedColor: item.selectedColor || '',
     selectedSize: item.selectedSize || '',
+    customDesign: item.customDesign || null,
     unitPrice: item.unitPrice,
     price: item.unitPrice,
     quantity: item.quantity,
@@ -337,13 +352,14 @@ const createOrder = async ({ authenticatedUser, payload }) => {
     const validated = validateCreateOrderInput(payload);
     assertUserCanPlaceOrder(authenticatedUser);
 
-    const session = await mongoose.startSession();
-    let orderId;
+    for (let attempt = 1; attempt <= MAX_TRANSACTION_ATTEMPTS; attempt += 1) {
+        const session = await mongoose.startSession();
+        let orderId;
 
-    try {
-        session.startTransaction();
+        try {
+            session.startTransaction();
 
-        const user = await User.findById(authenticatedUser._id).session(session).select('+password');
+            const user = await User.findById(authenticatedUser._id).session(session).select('+password');
         if (!user) {
             throw new ApiError(404, 'User not found');
         }
@@ -391,6 +407,7 @@ const createOrder = async ({ authenticatedUser, payload }) => {
                 productImage: product.image || '',
                 selectedColor: item.selectedColor || '',
                 selectedSize: item.selectedSize || '',
+                customDesign: item.customDesign || null,
                 unitPrice,
                 quantity: item.quantity,
                 lineTotal,
@@ -536,16 +553,23 @@ const createOrder = async ({ authenticatedUser, payload }) => {
             session,
         });
 
-        orderId = createdOrder._id;
-        await session.commitTransaction();
-    } catch (error) {
-        await session.abortTransaction();
-        throw error;
-    } finally {
-        session.endSession();
+            orderId = createdOrder._id;
+            await session.commitTransaction();
+            return getOrderForUser({ orderId, requester: authenticatedUser });
+        } catch (error) {
+            await session.abortTransaction().catch(() => null);
+
+            if (isTransientTransactionError(error) && attempt < MAX_TRANSACTION_ATTEMPTS) {
+                continue;
+            }
+
+            throw error;
+        } finally {
+            session.endSession();
+        }
     }
 
-    return getOrderForUser({ orderId, requester: authenticatedUser });
+    throw new ApiError(500, 'Failed to create order');
 };
 
 const listMyOrders = async ({ requester }) => {

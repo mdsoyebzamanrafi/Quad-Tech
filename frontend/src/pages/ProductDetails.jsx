@@ -74,6 +74,15 @@ const ProductDetails = () => {
         navigate('/cart');
     };
 
+    const customizeHandler = () => {
+        navigate(`/product/${product._id}/customize`, {
+            state: {
+                selectedSize,
+                qty,
+            },
+        });
+    };
+
     const handleAddToWishlist = async () => {
         try {
             await api.post('/api/wishlist', { productId: product._id });
@@ -321,6 +330,13 @@ const ProductDetails = () => {
                             onClick={addToCartHandler}
                         >
                             <ShoppingCart size={20} /> Add To Cart
+                        </button>
+                        <button
+                            className="btn btn-outline btn-full"
+                            disabled={normalizedProduct.countInStock === 0}
+                            onClick={customizeHandler}
+                        >
+                            <Palette size={20} /> Customize
                         </button>
                         <button
                             className="btn btn-secondary btn-full"

@@ -1,4 +1,6 @@
 import asyncHandler from '../utils/asyncHandler.js';
+import ApiError from '../errors/ApiError.js';
+import { uploadImageBuffer } from '../services/cloudinaryService.js';
 import {
     createOrder,
     listMyOrders,
@@ -11,6 +13,28 @@ import {
     updatePaymentStatusByAdmin,
     updateAdminNote,
 } from '../services/orderService.js';
+
+const uploadCustomDesignPreview = asyncHandler(async (req, res) => {
+    if (!req.file) {
+        throw new ApiError(400, 'Preview image is required');
+    }
+
+    try {
+        const uploadedImage = await uploadImageBuffer({
+            buffer: req.file.buffer,
+            folder: `custom-shirt-previews/${req.user._id}`,
+            originalFilename: req.file.originalname,
+        });
+
+        res.status(201).json({
+            success: true,
+            previewImageUrl: uploadedImage.secure_url,
+            publicId: uploadedImage.public_id,
+        });
+    } catch (error) {
+        throw new ApiError(502, 'Could not upload custom design preview');
+    }
+});
 
 const placeOrder = asyncHandler(async (req, res) => {
     const order = await createOrder({ authenticatedUser: req.user, payload: req.body });
@@ -103,4 +127,5 @@ export {
     updateOrderStatusAdmin,
     updatePaymentStatusAdmin,
     updateAdminNoteController,
+    uploadCustomDesignPreview,
 };

@@ -47,6 +47,63 @@ const normalizePaymentMethod = (value) => {
 
 const normalizeOptionalText = (value) => cleanString(value);
 
+const normalizeOptionalNumber = (value, fallback = 0) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+};
+
+const isHexColor = (value) => /^#[0-9a-f]{6}$/i.test(value);
+
+const normalizeCustomDesign = (value) => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+        return null;
+    }
+
+    const designs = Array.isArray(value.designs)
+        ? value.designs
+            .slice(0, 30)
+            .map((design, index) => ({
+                assetId: cleanString(design?.assetId),
+                imagePath: cleanString(design?.imagePath),
+                x: normalizeOptionalNumber(design?.x),
+                y: normalizeOptionalNumber(design?.y),
+                width: Math.max(normalizeOptionalNumber(design?.width), 0),
+                height: Math.max(normalizeOptionalNumber(design?.height), 0),
+                rotation: normalizeOptionalNumber(design?.rotation),
+                zIndex: Number.isInteger(Number(design?.zIndex)) ? Number(design.zIndex) : index + 1,
+            }))
+            .filter((design) => design.assetId)
+        : [];
+
+    const shirtColor = cleanString(value.shirtColor);
+
+    return {
+        designId: cleanString(value.designId),
+        shirtColor: isHexColor(shirtColor) ? shirtColor : '',
+        templateId: cleanString(value.templateId),
+        templatePath: cleanString(value.templatePath),
+        previewImageUrl: cleanString(value.previewImageUrl),
+        previewImagePublicId: cleanString(value.previewImagePublicId),
+        designs,
+    };
+};
+
+const buildCustomDesignKey = (customDesign) => {
+    if (!customDesign) {
+        return '';
+    }
+
+    if (customDesign.designId) {
+        return customDesign.designId;
+    }
+
+    return JSON.stringify({
+        shirtColor: customDesign.shirtColor,
+        templateId: customDesign.templateId,
+        designs: customDesign.designs,
+    });
+};
+
 const validateCreateOrderInput = (payload) => {
     if (!payload || typeof payload !== 'object') {
         throw new ApiError(400, 'Request body is required');
@@ -63,12 +120,14 @@ const validateCreateOrderInput = (payload) => {
         const quantity = requirePositiveInteger(item.qty, 'orderItems.qty');
         const selectedColor = normalizeOptionalText(item.selectedColor);
         const selectedSize = normalizeOptionalText(item.selectedSize);
-        const itemKey = `${productId}::${selectedColor}::${selectedSize}`;
+        const customDesign = normalizeCustomDesign(item.customDesign);
+        const itemKey = `${productId}::${selectedColor}::${selectedSize}::${buildCustomDesignKey(customDesign)}`;
         const existing = dedupeMap.get(itemKey) || {
             productId,
             quantity: 0,
             selectedColor,
             selectedSize,
+            customDesign,
         };
 
         existing.quantity += quantity;

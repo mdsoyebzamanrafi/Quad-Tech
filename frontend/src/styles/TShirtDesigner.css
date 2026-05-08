@@ -1,0 +1,327 @@
+.designer-page {
+    padding: 3rem 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.designer-header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 1.5rem;
+}
+
+.designer-header p {
+    color: var(--color-accent-2);
+    font-size: 0.8rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    text-align: right;
+}
+
+.designer-header h1 {
+    color: var(--text-main);
+    font-size: clamp(2rem, 4vw, 3.2rem);
+    text-align: right;
+}
+
+.designer-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 340px;
+    gap: 1.5rem;
+    align-items: start;
+}
+
+.designer-stage-panel,
+.designer-sidebar {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 24px;
+    box-shadow: var(--shadow-md);
+}
+
+.designer-stage-panel {
+    padding: clamp(0.75rem, 2vw, 1.5rem);
+}
+
+.designer-surface {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1;
+    overflow: hidden;
+    border-radius: 18px;
+    background: var(--bg-primary);
+    touch-action: none;
+    user-select: none;
+}
+
+.designer-shirt-svg,
+.designer-shirt-svg svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+}
+
+.designer-placed-design {
+    position: absolute;
+    transform-origin: center;
+    cursor: grab;
+    touch-action: none;
+}
+
+.designer-placed-design:active {
+    cursor: grabbing;
+}
+
+.designer-placed-design img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    pointer-events: none;
+    filter: drop-shadow(0 10px 16px rgba(0, 0, 0, 0.16));
+}
+
+.designer-placed-design.active {
+    outline: 2px dashed var(--color-accent-2);
+    outline-offset: 6px;
+}
+
+.designer-control,
+.designer-resize-control {
+    position: absolute;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: 1px solid var(--border-color);
+    background: var(--bg-secondary);
+    color: var(--text-main);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: var(--shadow-sm);
+}
+
+.designer-delete-control {
+    top: -46px;
+    right: -46px;
+}
+
+.designer-rotate-control {
+    top: -46px;
+    left: -46px;
+    cursor: grab;
+}
+
+.designer-resize-control {
+    right: -46px;
+    bottom: -46px;
+    cursor: nwse-resize;
+}
+
+.designer-resize-control::after {
+    content: '';
+    width: 12px;
+    height: 12px;
+    border-right: 2px solid currentColor;
+    border-bottom: 2px solid currentColor;
+}
+
+.designer-sidebar {
+    padding: 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    position: sticky;
+    top: 96px;
+}
+
+.designer-sidebar-section {
+    display: grid;
+    gap: 0.85rem;
+    padding-bottom: 1.2rem;
+    border-bottom: 1px dashed var(--border-color);
+}
+
+.designer-sidebar-section:last-child {
+    border-bottom: 0;
+    padding-bottom: 0;
+}
+
+.designer-section-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    color: var(--text-main);
+    font-size: 0.92rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.designer-section-heading strong {
+    color: var(--text-muted);
+    font-size: 0.82rem;
+    font-weight: 700;
+    text-transform: none;
+    letter-spacing: 0;
+}
+
+.designer-color-picker {
+    display: grid;
+    grid-template-columns: 54px 1fr;
+    gap: 0.75rem;
+}
+
+.designer-color-picker input[type='color'] {
+    width: 54px;
+    height: 46px;
+    padding: 0;
+    overflow: hidden;
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    background: transparent;
+}
+
+.designer-color-picker input[type='text'],
+.designer-select {
+    min-height: 46px;
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-primary);
+    color: var(--text-main);
+    padding: 0.75rem 0.9rem;
+    font: inherit;
+    font-weight: 700;
+}
+
+.designer-color-picker input:focus,
+.designer-select:focus {
+    outline: none;
+    border-color: var(--color-accent-2);
+    box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.12);
+}
+
+.designer-swatches {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 0.55rem;
+}
+
+.designer-swatch {
+    aspect-ratio: 1;
+    border-radius: 50%;
+    border: 2px solid var(--bg-secondary);
+    box-shadow: 0 0 0 1px var(--border-color);
+}
+
+.designer-swatch.active {
+    box-shadow: 0 0 0 3px var(--color-accent-2);
+}
+
+.designer-thumbnail-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.7rem;
+}
+
+.designer-thumbnail-button {
+    min-height: 94px;
+    border-radius: 14px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-primary);
+    padding: 0.6rem;
+    transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.designer-thumbnail-button:hover {
+    border-color: var(--color-accent-2);
+    transform: translateY(-2px);
+}
+
+.designer-thumbnail-button img {
+    width: 100%;
+    height: 80px;
+    object-fit: contain;
+    pointer-events: none;
+}
+
+.designer-icon-action {
+    min-height: 42px;
+    border-radius: 12px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-primary);
+    color: var(--text-main);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    font-weight: 800;
+}
+
+.designer-icon-action:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+}
+
+.designer-field-label {
+    color: var(--text-muted);
+    font-size: 0.88rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+}
+
+.designer-actions {
+    display: grid;
+    gap: 0.8rem;
+}
+
+.designer-error {
+    padding: 1rem 1.25rem;
+    border-radius: 16px;
+    color: var(--color-accent-1);
+    border: 1px solid rgba(236, 72, 153, 0.25);
+}
+
+@media (max-width: 1040px) {
+    .designer-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .designer-sidebar {
+        position: static;
+    }
+}
+
+@media (max-width: 640px) {
+    .designer-page {
+        padding: 1.5rem 0;
+    }
+
+    .designer-header {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .designer-header p,
+    .designer-header h1 {
+        text-align: left;
+    }
+
+    .designer-thumbnail-grid {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+
+    .designer-thumbnail-button {
+        min-height: 76px;
+        padding: 0.4rem;
+    }
+
+    .designer-thumbnail-button img {
+        height: 58px;
+    }
+}

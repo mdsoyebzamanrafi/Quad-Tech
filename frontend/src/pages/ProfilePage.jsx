@@ -157,7 +157,7 @@ const ProfilePage = () => {
                                             <tr key={`${order._id}-${item.product}`} style={{ borderBottom: '1px solid var(--border-color)', opacity: 0.9 }}>
                                                 <td style={{ padding: '1rem 0' }}>
                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                                                        <img src={item.image} alt={item.name} style={{ width: '40px', borderRadius: '4px' }} />
+                                                        <img src={item.customDesign?.previewImageUrl || item.image} alt={item.name} style={{ width: '40px', borderRadius: '4px' }} />
                                                         <div>
                                                             <div style={{ fontWeight: '500' }}>{item.name} (x{item.qty})</div>
                                                             {getProductOptionSummary(item) && (

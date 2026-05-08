@@ -171,7 +171,7 @@ const CartPage = () => {
                             {cartItems.map((item) => (
                                 <div key={item.cartItemKey || item.product} className="cart-item glass">
                                     <div className="cart-item-image">
-                                        <img src={item.image} alt={item.name} />
+                                        <img src={item.customDesign?.previewImageUrl || item.image} alt={item.name} />
                                     </div>
 
                                     <div className="cart-item-details">
@@ -192,6 +192,7 @@ const CartPage = () => {
                                                     addToCart(item.product, Number(e.target.value), {
                                                         selectedColor: item.selectedColor,
                                                         selectedSize: item.selectedSize,
+                                                        customDesign: item.customDesign,
                                                     })
                                                 }
                                                 className="qty-select"

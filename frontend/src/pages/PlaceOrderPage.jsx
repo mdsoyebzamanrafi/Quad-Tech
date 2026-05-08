@@ -14,6 +14,37 @@ const emptySmartDiscount = {
     discountAmount: 0,
 };
 
+const isDataUrl = (value) => typeof value === 'string' && value.startsWith('data:image/');
+
+const uploadCustomDesignPreview = async (item) => {
+    const previewImageUrl = item?.customDesign?.previewImageUrl;
+
+    if (!isDataUrl(previewImageUrl)) {
+        return item;
+    }
+
+    try {
+        const response = await fetch(previewImageUrl);
+        const blob = await response.blob();
+        const formData = new FormData();
+        formData.append('image', blob, `${item.customDesign.designId || item.product}-preview.png`);
+
+        const { data } = await api.post('/api/orders/custom-design-preview', formData);
+
+        return {
+            ...item,
+            customDesign: {
+                ...item.customDesign,
+                previewImageUrl: data.previewImageUrl,
+                previewImagePublicId: data.publicId,
+            },
+        };
+    } catch (error) {
+        console.error('Failed to upload custom design preview. Using local preview data.', error);
+        return item;
+    }
+};
+
 const PlaceOrderPage = () => {
     const navigate = useNavigate();
     const {
@@ -228,8 +259,9 @@ const PlaceOrderPage = () => {
             return;
         }
         try {
+            const orderItems = await Promise.all(cartItems.map(uploadCustomDesignPreview));
             const { data } = await api.post('/api/orders', {
-                orderItems: cartItems,
+                orderItems,
                 shippingAddress: shippingAddress,
                 shippingPhone: shippingAddress.phone || userInfo?.phone,
                 paymentMethod: paymentMethod,
@@ -373,7 +405,7 @@ const PlaceOrderPage = () => {
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                                 {cartItems.map((item, index) => (
                                     <div key={index} style={{ display: 'flex', alignItems: 'center', gap: '1rem', paddingBottom: '1rem', borderBottom: '1px solid var(--border-color)' }}>
-                                        <img src={item.image} alt={item.name} style={{ width: '60px', borderRadius: '8px' }} />
+                                        <img src={item.customDesign?.previewImageUrl || item.image} alt={item.name} style={{ width: '60px', borderRadius: '8px' }} />
                                         <div style={{ flex: 1 }}>
                                             <Link to={`/product/${item.product}`} style={{ color: 'var(--text-main)', textDecoration: 'none', fontWeight: '500' }}>
                                                 {item.name}
