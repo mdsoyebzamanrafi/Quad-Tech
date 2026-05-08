@@ -9,9 +9,9 @@ frontend/dist/
 backend/dist/
 
 # Env files
-# .env
-# backend/.env
-# frontend/.env
+.env
+backend/.env
+frontend/.env
 *.local
 
 # Logs
