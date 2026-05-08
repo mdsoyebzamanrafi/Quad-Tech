@@ -1,3 +1,5 @@
+import { validateIntent } from './recommendationIntentService.js';
+
 const GEMINI_API_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta';
 const DEFAULT_GEMINI_VISION_MODEL = 'gemini-2.5-flash';
 const GEMINI_FALLBACK_VISION_MODELS = ['gemini-2.0-flash'];
@@ -31,6 +33,8 @@ const emptyAttributes = {
     keywords: [],
     confidence: 0,
 };
+
+const buildEmptySearchIntent = (validValues = {}) => validateIntent({}, validValues);
 
 const truncateText = (value, limit = MAX_RAW_TEXT_LENGTH) => {
     const text = typeof value === 'string' ? value : JSON.stringify(value ?? '');
@@ -200,7 +204,7 @@ const parseGeminiJsonResponse = (text) => {
     return JSON.parse(jsonText);
 };
 
-const buildGeminiPrompt = (validValues) => `You are analyzing a user's clothing image for an ecommerce recommendation system.
+const buildCloudClosetPrompt = (validValues) => `You are analyzing a user's clothing image for an ecommerce recommendation system.
 
 Return ONLY valid JSON.
 No markdown.
@@ -258,6 +262,72 @@ Rules:
     "confidence": 0
   }`;
 
+const buildImageSearchPrompt = (validValues) => `You analyze a product image for an ecommerce product search system.
+
+Return ONLY valid JSON.
+No markdown.
+No explanation.
+
+Use this schema:
+{
+  "department": null,
+  "category": null,
+  "productType": null,
+  "brand": null,
+  "gender": null,
+  "minPrice": null,
+  "maxPrice": null,
+  "requestedColors": [],
+  "requestedSizes": [],
+  "requestedMaterials": [],
+  "fit": null,
+  "occasion": null,
+  "season": null,
+  "styleTags": [],
+  "sortBy": "recommended",
+  "confidence": 0
+}
+
+Valid values:
+${JSON.stringify(validValues)}
+
+Rules:
+- Analyze only the visible fashion or product item.
+- Ignore the background.
+- Do not identify people.
+- Do not invent brand names.
+- Use only valid values from the valid values list when possible.
+- If unsure, use null or [].
+- department should be "fashion" only when the image clearly shows a fashion product.
+- category should be the product family, for example Dresses, Shoes, Bags, Shirts.
+- productType should be the normalized exact type, for example dress, sneaker, tote bag, t-shirt.
+- requestedColors should contain visible item colors.
+- requestedMaterials should only be filled when visually likely.
+- requestedSizes should usually be [] unless a size is clearly visible on the product itself.
+- season, occasion, and styleTags should be inferred conservatively.
+- sortBy should always be "recommended".
+- confidence must be 0 to 1.
+- If the image is not a clothing or fashion product, return mostly null fields and low confidence.
+`;
+
+const validateImageSearchIntent = (rawIntent = {}, validValues = {}) => ({
+    ...validateIntent(rawIntent, validValues),
+    sortBy: 'recommended',
+});
+
+const ANALYSIS_MODE_CONFIG = {
+    closet: {
+        buildPrompt: buildCloudClosetPrompt,
+        validateResult: validateCloudClosetAttributes,
+        resultKey: 'attributes',
+    },
+    search: {
+        buildPrompt: buildImageSearchPrompt,
+        validateResult: validateImageSearchIntent,
+        resultKey: 'intent',
+    },
+};
+
 const extractGeminiText = (responseBody) => {
     const parts = responseBody?.candidates?.[0]?.content?.parts;
     const text = Array.isArray(parts)
@@ -310,8 +380,15 @@ const loadImageBufferFromUrl = async (imageUrl) => {
     };
 };
 
-const requestGeminiAnalysis = async ({ aiModel, analysisImageBuffer, analysisMimeType, validValues }) => {
-    const geminiPrompt = buildGeminiPrompt(validValues);
+const requestGeminiAnalysis = async ({
+    aiModel,
+    analysisImageBuffer,
+    analysisMimeType,
+    validValues,
+    mode = 'closet',
+}) => {
+    const modeConfig = ANALYSIS_MODE_CONFIG[mode] || ANALYSIS_MODE_CONFIG.closet;
+    const geminiPrompt = modeConfig.buildPrompt(validValues);
     const url = buildGeminiGenerateContentUrl(aiModel);
     logCloudCloset('Gemini analysis starting', {
         aiModel,
@@ -381,13 +458,13 @@ const requestGeminiAnalysis = async ({ aiModel, analysisImageBuffer, analysisMim
         geminiText = extractGeminiText(responseBody);
         logCloudCloset('Gemini candidate text follows:\n', geminiText);
         const rawAttributes = parseGeminiJsonResponse(geminiText);
-        logCloudCloset('Gemini parsed attributes', rawAttributes);
-        const attributes = validateCloudClosetAttributes(rawAttributes, validValues);
-        logCloudCloset('Gemini validated attributes', attributes);
+        logCloudCloset('Gemini parsed result', rawAttributes);
+        const validatedResult = modeConfig.validateResult(rawAttributes, validValues);
+        logCloudCloset('Gemini validated result', validatedResult);
 
         return {
             aiModel,
-            attributes,
+            [modeConfig.resultKey]: validatedResult,
             rawAiResponse: {
                 text: truncateText(geminiText),
                 parsed: rawAttributes,
@@ -404,7 +481,7 @@ const requestGeminiAnalysis = async ({ aiModel, analysisImageBuffer, analysisMim
     }
 };
 
-const analyzeCloudClosetImage = async ({ imageBuffer, imageUrl, mimeType, validValues }) => {
+const analyzeFashionImage = async ({ imageBuffer, imageUrl, mimeType, validValues, mode = 'closet' }) => {
     if (!process.env.GEMINI_API_KEY) {
         logCloudClosetError('Gemini API key is missing before analysis call');
         throw new Error('Gemini API key is missing.');
@@ -437,6 +514,7 @@ const analyzeCloudClosetImage = async ({ imageBuffer, imageUrl, mimeType, validV
                 analysisImageBuffer,
                 analysisMimeType,
                 validValues,
+                mode,
             });
         } catch (error) {
             lastError = error;
@@ -451,11 +529,40 @@ const analyzeCloudClosetImage = async ({ imageBuffer, imageUrl, mimeType, validV
     throw lastError || new Error('Gemini Vision analysis failed.');
 };
 
+const analyzeCloudClosetImage = async ({ imageBuffer, imageUrl, mimeType, validValues }) =>
+    analyzeFashionImage({
+        imageBuffer,
+        imageUrl,
+        mimeType,
+        validValues,
+        mode: 'closet',
+    });
+
+const analyzeImageSearchIntent = async ({ imageBuffer, imageUrl, mimeType, validValues }) => {
+    const analysis = await analyzeFashionImage({
+        imageBuffer,
+        imageUrl,
+        mimeType,
+        validValues,
+        mode: 'search',
+    });
+
+    return {
+        aiModel: analysis.aiModel,
+        intent: analysis.intent || buildEmptySearchIntent(validValues),
+        rawAiResponse: analysis.rawAiResponse,
+    };
+};
+
 export {
+    analyzeFashionImage,
     analyzeCloudClosetImage,
+    analyzeImageSearchIntent,
+    buildEmptySearchIntent,
     emptyAttributes,
     getGeminiVisionModel,
     getGeminiVisionModels,
     parseGeminiJsonResponse,
     validateCloudClosetAttributes,
+    validateImageSearchIntent,
 };
