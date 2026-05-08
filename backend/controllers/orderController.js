@@ -12,7 +12,9 @@ import {
     updateOrderStatusByAdmin,
     updatePaymentStatusByAdmin,
     updateAdminNote,
+    confirmAndDeliverAllOrdersBySuperAdmin,
 } from '../services/orderService.js';
+import { USER_ROLES } from '../constants/domainConstants.js';
 
 const uploadCustomDesignPreview = asyncHandler(async (req, res) => {
     if (!req.file) {
@@ -115,6 +117,18 @@ const updateAdminNoteController = asyncHandler(async (req, res) => {
     res.json(order);
 });
 
+const confirmAndDeliverAllOrdersAdmin = asyncHandler(async (req, res) => {
+    if (req.user?.role !== USER_ROLES.SUPER_ADMIN) {
+        return res.status(403).json({
+            success: false,
+            message: 'Only Super Admin can perform this action.',
+        });
+    }
+
+    const result = await confirmAndDeliverAllOrdersBySuperAdmin({ actor: req.user });
+    res.json(result);
+});
+
 export {
     placeOrder,
     getMyOrders,
@@ -127,5 +141,6 @@ export {
     updateOrderStatusAdmin,
     updatePaymentStatusAdmin,
     updateAdminNoteController,
+    confirmAndDeliverAllOrdersAdmin,
     uploadCustomDesignPreview,
 };

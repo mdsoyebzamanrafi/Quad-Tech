@@ -13,8 +13,9 @@ import {
     updatePaymentStatusAdmin,
     updateAdminNoteController,
     uploadCustomDesignPreview,
+    confirmAndDeliverAllOrdersAdmin,
 } from '../controllers/orderController.js';
-import { protect, requireActiveAdmin } from '../middleware/authMiddleware.js';
+import { protect, requireActiveAdmin, requireActiveSuperAdmin } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 const MAX_CUSTOM_PREVIEW_SIZE_BYTES = 5 * 1024 * 1024;
@@ -70,6 +71,7 @@ router.put('/:id/deliver', protect, markOwnOrderAsReceived);
 
 // Admin order management endpoints
 router.get('/admin', protect, requireActiveAdmin, getAllOrdersAdmin);
+router.patch('/admin/confirm-and-deliver-all', protect, requireActiveSuperAdmin, confirmAndDeliverAllOrdersAdmin);
 router.get('/admin/:id', protect, requireActiveAdmin, getOrderByIdAdmin);
 router.patch('/admin/:id/status', protect, requireActiveAdmin, updateOrderStatusAdmin);
 router.patch('/admin/:id/payment-status', protect, requireActiveAdmin, updatePaymentStatusAdmin);
