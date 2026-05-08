@@ -7,6 +7,7 @@ import api from '../utils/api';
 import { DEPARTMENT_OPTIONS } from '../utils/catalog';
 import ImageProductSearch from '../components/ImageProductSearch';
 import RecommendedForYou from '../components/RecommendedForYou';
+import { useCurrency } from '../context/CurrencyContext';
 import {
     buildFashionMetaLine,
     getDepartmentLabel,
@@ -67,6 +68,8 @@ const HomePage = () => {
     const [imageSearchError, setImageSearchError] = useState('');
     const [imageSearchResult, setImageSearchResult] = useState(null);
     const [imageSearchActive, setImageSearchActive] = useState(false);
+
+    const { formatCurrency } = useCurrency();
 
     const navigate = useNavigate();
     const location = useLocation();
@@ -839,7 +842,7 @@ const HomePage = () => {
                                                 <p className="fashion-meta-line">{fashionMeta}</p>
                                             )}
                                             <div className="product-card-footer">
-                                                <p className="price">${Number(product.price || 0).toFixed(2)}</p>
+                                                <p className="price">{formatCurrency(product.price)}</p>
                                                 <span
                                                     className={`stock-pill ${
                                                         stockLabel === 'Out of Stock'

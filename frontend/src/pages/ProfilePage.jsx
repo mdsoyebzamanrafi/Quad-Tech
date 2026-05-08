@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { User, Package, Mail, Lock } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useCurrency } from '../context/CurrencyContext';
 import api from '../utils/api';
 import '../styles/LoginPage.css';
 import { getProductOptionSummary } from '../utils/productUtils';
@@ -15,6 +16,7 @@ const ProfilePage = () => {
     const [orders, setOrders] = useState([]);
 
     const { userInfo } = useAuth();
+    const { formatCurrency } = useCurrency();
     const navigate = useNavigate();
 
     const getMyOrders = async () => {
@@ -169,7 +171,7 @@ const ProfilePage = () => {
                                                     </div>
                                                 </td>
                                                 <td style={{ padding: '1rem 0' }}>{order.createdAt.substring(0, 10)}</td>
-                                                <td style={{ padding: '1rem 0' }}>${(item.price * item.qty).toFixed(2)}</td>
+                                                <td style={{ padding: '1rem 0' }}>{formatCurrency(item.price * item.qty)}</td>
                                                 <td style={{ padding: '1rem 0' }}>
                                                     <span style={{ color: 'var(--text-muted)' }}>{order.deliveredAt.substring(0, 10)}</span>
                                                 </td>

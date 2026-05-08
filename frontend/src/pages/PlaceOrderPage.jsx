@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
+import { useCurrency } from '../context/CurrencyContext';
 import { Package, Truck, CreditCard } from 'lucide-react';
 import api from '../utils/api';
 import { getEligibleSmartDiscount } from '../services/discountService';
@@ -62,6 +63,7 @@ const PlaceOrderPage = () => {
         clearDiscounts,
     } = useCart();
     const { userInfo } = useAuth();
+    const { formatCurrency } = useCurrency();
     const [profile, setProfile] = useState(userInfo);
     const [couponInput, setCouponInput] = useState(savedCouponCode || '');
     const [couponLoading, setCouponLoading] = useState(false);
@@ -201,7 +203,7 @@ const PlaceOrderPage = () => {
                 couponDiscount: data.discountAmount,
             });
             setCouponInput(data.code);
-            setCouponMessage(`Coupon applied. Discount: $${addDecimals(data.discountAmount)}`);
+            setCouponMessage(`Coupon applied. Discount: ${formatCurrency(data.discountAmount)}`);
         } catch (error) {
             const message = error.response?.data?.message || 'Failed to validate coupon';
             removeCoupon();
@@ -255,7 +257,7 @@ const PlaceOrderPage = () => {
     };
 
     const placeOrderHandler = async () => {
-        if (!window.confirm(`Are you sure you want to pay an amount of $${totalPrice}?`)) {
+        if (!window.confirm(`Are you sure you want to pay an amount of ${formatCurrency(totalPriceNumber)}?`)) {
             return;
         }
         try {
@@ -417,7 +419,7 @@ const PlaceOrderPage = () => {
                                             )}
                                         </div>
                                         <div style={{ color: 'var(--text-main)', fontWeight: '600' }}>
-                                            {item.qty} x ${item.price} = ${(item.qty * item.price).toFixed(2)}
+                                            {item.qty} x {formatCurrency(item.price)} = {formatCurrency(item.qty * item.price)}
                                         </div>
                                     </div>
                                 ))}
@@ -432,12 +434,12 @@ const PlaceOrderPage = () => {
 
                         <div className="summary-row">
                             <span>Items</span>
-                            <span>${itemsPrice}</span>
+                            <span>{formatCurrency(itemsPriceNumber)}</span>
                         </div>
 
                         <div className="summary-row">
                             <span>Coupon Discount</span>
-                            <span>- ${addDecimals(savedCouponDiscount || 0)}</span>
+                            <span>- {formatCurrency(savedCouponDiscount || 0)}</span>
                         </div>
 
                         {smartDiscount.eligible && effectiveSmartDiscount > 0 && (
@@ -455,34 +457,34 @@ const PlaceOrderPage = () => {
 
                         <div className="summary-row">
                             <span>Token Discount</span>
-                            <span>- ${addDecimals(tokenPreview.discountAmount)}</span>
+                            <span>- {formatCurrency(tokenPreview.discountAmount)}</span>
                         </div>
 
                         <div className="summary-row">
                             <span>Total Discount</span>
-                            <span>- ${addDecimals(totalDiscountNumber)}</span>
+                            <span>- {formatCurrency(totalDiscountNumber)}</span>
                         </div>
 
                         <div className="summary-row">
                             <span>Net Items</span>
-                            <span>${addDecimals(netItemsPriceNumber)}</span>
+                            <span>{formatCurrency(netItemsPriceNumber)}</span>
                         </div>
 
                         <div className="summary-row">
                             <span>Shipping</span>
-                            <span>${shippingPrice}</span>
+                            <span>{formatCurrency(shippingPriceNumber)}</span>
                         </div>
 
                         <div className="summary-row">
                             <span>Tax</span>
-                            <span>${taxPrice}</span>
+                            <span>{formatCurrency(taxPriceNumber)}</span>
                         </div>
 
                         <div className="summary-divider"></div>
 
                         <div className="summary-row total-row">
                             <span>Final Total</span>
-                            <span className="text-gradient">${totalPrice}</span>
+                            <span className="text-gradient">{formatCurrency(totalPriceNumber)}</span>
                         </div>
 
                         <button

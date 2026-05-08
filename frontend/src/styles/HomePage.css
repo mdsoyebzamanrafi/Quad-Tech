@@ -34,8 +34,11 @@
 
 .full-width-hero {
     width: 100vw;
-    margin-left: calc(-50vw + 50%);
-    margin-right: calc(-50vw + 50%);
+    position: relative;
+    left: 50%;
+    right: 50%;
+    margin-left: -50vw;
+    margin-right: -50vw;
     background: var(--bg-secondary);
     border-bottom: 1px solid var(--border-color);
     margin-bottom: 4rem;

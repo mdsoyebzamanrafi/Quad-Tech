@@ -2,16 +2,16 @@ import React, { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, CreditCard, Gift, TicketPercent, Truck } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useCurrency } from '../context/CurrencyContext';
 import api from '../utils/api';
 import '../styles/CartPage.css';
 import { getProductOptionSummary } from '../utils/productUtils';
-
-const formatMoney = (value) => `$${(Number(value || 0)).toFixed(2)}`;
 
 const OrderPage = () => {
     const { id } = useParams();
     const navigate = useNavigate();
     const { userInfo } = useAuth();
+    const { formatCurrency } = useCurrency();
     const [order, setOrder] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -97,7 +97,7 @@ const OrderPage = () => {
                                         <div style={{ color: 'var(--text-muted)' }}>Qty: {item.qty}</div>
                                     </div>
                                     <div style={{ color: 'var(--text-main)', fontWeight: 600 }}>
-                                        {formatMoney(item.lineTotal)}
+                                        {formatCurrency(item.lineTotal)}
                                     </div>
                                 </div>
                             ))}
@@ -111,7 +111,7 @@ const OrderPage = () => {
 
                         <div className="summary-row">
                             <span>Gross Items Price</span>
-                            <span>{formatMoney(order.grossItemsPrice || order.itemsPrice)}</span>
+                            <span>{formatCurrency(order.grossItemsPrice || order.itemsPrice)}</span>
                         </div>
                         <div className="summary-row">
                             <span>Coupon Code</span>
@@ -119,7 +119,7 @@ const OrderPage = () => {
                         </div>
                         <div className="summary-row">
                             <span>Coupon Discount</span>
-                            <span>- {formatMoney(order.coupon?.discountAmount)}</span>
+                            <span>- {formatCurrency(order.coupon?.discountAmount)}</span>
                         </div>
                         <div className="summary-row">
                             <span>Smart Discount Rule</span>
@@ -135,23 +135,23 @@ const OrderPage = () => {
                         </div>
                         <div className="summary-row">
                             <span>Token Discount</span>
-                            <span>- {formatMoney(order.tokenDiscount?.discountAmount)}</span>
+                            <span>- {formatCurrency(order.tokenDiscount?.discountAmount)}</span>
                         </div>
                         <div className="summary-row">
                             <span>Total Discount</span>
-                            <span>- {formatMoney(order.totalDiscount || order.discount)}</span>
+                            <span>- {formatCurrency(order.totalDiscount || order.discount)}</span>
                         </div>
                         <div className="summary-row">
                             <span>Net Items Price</span>
-                            <span>{formatMoney(order.netItemsPrice)}</span>
+                            <span>{formatCurrency(order.netItemsPrice)}</span>
                         </div>
                         <div className="summary-row">
                             <span>Tax</span>
-                            <span>{formatMoney(order.taxPrice || order.tax)}</span>
+                            <span>{formatCurrency(order.taxPrice || order.tax)}</span>
                         </div>
                         <div className="summary-row">
                             <span>Shipping</span>
-                            <span>{formatMoney(order.shippingPrice || order.shippingFee)}</span>
+                            <span>{formatCurrency(order.shippingPrice || order.shippingFee)}</span>
                         </div>
                         <div className="summary-row">
                             <span>Tokens Earned</span>
@@ -160,7 +160,7 @@ const OrderPage = () => {
                         <div className="summary-divider"></div>
                         <div className="summary-row total-row">
                             <span>Final Total</span>
-                            <span className="text-gradient">{formatMoney(order.totalPrice || order.total)}</span>
+                            <span className="text-gradient">{formatCurrency(order.totalPrice || order.total)}</span>
                         </div>
 
                         <div style={{ marginTop: '1.25rem', display: 'grid', gap: '0.75rem' }}>
