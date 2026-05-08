@@ -127,7 +127,7 @@ const OrderPage = () => {
                         </div>
                         <div className="summary-row">
                             <span>Smart Discount</span>
-                            <span>- {formatMoney(order.smartDiscount?.discountAmount)}</span>
+                            <span>- {formatCurrency(order.smartDiscount?.discountAmount)}</span>
                         </div>
                         <div className="summary-row">
                             <span>Tokens Used</span>
