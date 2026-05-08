@@ -475,6 +475,23 @@
     backdrop-filter: blur(10px);
 }
 
+.gift-promoted-badge {
+    position: absolute;
+    top: 3.9rem;
+    left: 1rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0.34rem 0.68rem;
+    border-radius: 9999px;
+    background: rgba(15, 23, 42, 0.74);
+    color: white;
+    font-size: 0.66rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    box-shadow: var(--shadow-sm);
+}
+
 .gift-source-wishlist {
     background: linear-gradient(135deg, #ec4899, #db2777);
 }
@@ -772,6 +789,11 @@
     .gift-source-badge {
         top: auto;
         bottom: 1rem;
+        left: 1rem;
+    }
+
+    .gift-promoted-badge {
+        top: 1rem;
         left: 1rem;
     }
 }

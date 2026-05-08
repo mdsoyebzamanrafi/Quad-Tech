@@ -115,6 +115,10 @@ const getSourceBadge = (source) => {
         return 'Similar to wishlist';
     }
 
+    if (source === 'promoted_relevant_category') {
+        return 'Promoted category match';
+    }
+
     if (source === 'general_catalog') {
         return 'Catalog pick';
     }
@@ -129,6 +133,10 @@ const getSourceToneClass = (source) => {
 
     if (source === 'similar_to_wishlist') {
         return 'gift-source-similar';
+    }
+
+    if (source === 'promoted_relevant_category') {
+        return 'gift-source-general';
     }
 
     if (source === 'general_catalog') {
@@ -205,6 +213,7 @@ const breakdownEntries = [
     { key: 'budgetScore', label: 'Budget' },
     { key: 'qualityScore', label: 'Quality' },
     { key: 'priorityScore', label: 'Priority' },
+    { key: 'paidBoostScore', label: 'Paid boost' },
     { key: 'departmentScore', label: 'Department' },
     { key: 'penaltyScore', label: 'Penalty' },
     { key: 'totalBeforeClamp', label: 'Total before clamp' },
@@ -652,9 +661,25 @@ const GiftAssistantPage = () => {
                                         expandedBreakdowns[breakdownKey]
                                     );
                                     const department = normalizeDepartment(product.department);
+                                    const isPromoted =
+                                        Boolean(recommendation.isPromoted) ||
+                                        Boolean(product.isPromoted) ||
+                                        Number(recommendation.paidBoostScore) > 0 ||
+                                        Number(product.paidBoostScore) > 0;
                                     const visibleBreakdownEntries = breakdownEntries.filter(
-                                        (entry) =>
-                                            recommendation.scoreBreakdown?.[entry.key] !== undefined
+                                        (entry) => {
+                                            const value = recommendation.scoreBreakdown?.[entry.key];
+
+                                            if (value === undefined) {
+                                                return false;
+                                            }
+
+                                            if (entry.key === 'paidBoostScore') {
+                                                return Number(value) > 0;
+                                            }
+
+                                            return true;
+                                        }
                                     );
 
                                     return (
@@ -682,6 +707,11 @@ const GiftAssistantPage = () => {
                                                 >
                                                     {getSourceBadge(source)}
                                                 </span>
+                                                {isPromoted ? (
+                                                    <span className="gift-promoted-badge">
+                                                        Promoted
+                                                    </span>
+                                                ) : null}
 
                                                 <div className={`gift-score-badge ${scoreTone}`}>
                                                     <strong>{score}/100</strong>

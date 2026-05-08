@@ -31,7 +31,7 @@ const WishlistPage = () => {
         try {
             await api.delete(`/api/wishlist/${productId}`);
             setWishlistItems(wishlistItems.filter(item => item.product._id !== productId));
-        } catch (error) {
+        } catch {
             alert('Failed to remove item');
         }
     };

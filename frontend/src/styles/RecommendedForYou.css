@@ -140,6 +140,21 @@
     left: 0.9rem;
 }
 
+.recommended-promoted-badge {
+    position: absolute;
+    top: 3.2rem;
+    left: 0.9rem;
+    display: inline-flex;
+    align-items: center;
+    padding: 0.32rem 0.62rem;
+    border-radius: 9999px;
+    background: rgba(15, 23, 42, 0.74);
+    color: white;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+}
+
 .recommended-match-badge {
     right: 0.9rem;
     background: rgba(17, 24, 39, 0.78);
@@ -204,6 +219,12 @@
 .recommended-meta {
     color: var(--text-muted);
     font-size: 0.92rem;
+}
+
+.recommended-score-note {
+    color: var(--color-accent-1);
+    font-size: 0.86rem;
+    font-weight: 600;
 }
 
 .recommended-reasons {

@@ -465,4 +465,4 @@ const scoreGiftProduct = (product, giftContext, occasionContext) => {
     };
 };
 
-export { scoreGiftProduct };
+export { scoreGiftProduct, getRelationshipProfile };

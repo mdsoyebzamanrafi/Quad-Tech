@@ -40,6 +40,7 @@ import AdminDiscountsPage from './pages/admin/AdminDiscountsPage';
 import SalesDashboardPage from './pages/admin/SalesDashboardPage';
 import AdminProductsPage from './pages/admin/AdminProductsPage';
 import AdminProductFormPage from './pages/admin/AdminProductFormPage';
+import AdminPriorityBoostsPage from './pages/admin/AdminPriorityBoostsPage';
 import { ThemeProvider } from './context/ThemeContext';
 import { useAuth } from './context/AuthContext';
 import { CurrencyProvider } from './context/CurrencyContext';
@@ -109,6 +110,7 @@ function AppContent() {
             <Route path="products" element={<AdminProductsPage />} />
             <Route path="products/new" element={<AdminProductFormPage />} />
             <Route path="products/:id" element={<AdminProductFormPage />} />
+            <Route path="priority-boosts" element={<AdminPriorityBoostsPage />} />
             <Route path="coupons" element={<CouponListPage />} />
             <Route path="discounts" element={<AdminDiscountsPage />} />
             <Route path="coupon/create" element={<CouponCreatePage />} />

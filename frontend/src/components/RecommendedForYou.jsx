@@ -12,6 +12,8 @@ import {
 } from '../utils/productUtils';
 import '../styles/RecommendedForYou.css';
 
+const PERSONAL_RECOMMENDATION_LIMIT = 6;
+
 const buildMatchPercent = (finalScore) =>
     Math.min(99, Math.max(50, Math.round(Number(finalScore) || 0)));
 
@@ -188,7 +190,7 @@ const RecommendedForYou = ({ variant = 'section' }) => {
                         <h2>
                             {isPageVariant
                                 ? 'Based on your orders, cart, wishlist, Cloud Closet, and preferences'
-                                : 'Your next five likely picks'}
+                                : 'Your next six likely picks'}
                         </h2>
                     </div>
                     {!isPageVariant && (
@@ -212,11 +214,16 @@ const RecommendedForYou = ({ variant = 'section' }) => {
                 )}
 
                 <div className="recommended-grid">
-                    {recommendations.slice(0, 5).map((recommendation) => {
+                    {recommendations.slice(0, PERSONAL_RECOMMENDATION_LIMIT).map((recommendation) => {
                         const product = recommendation.product || {};
                         const matchPercent = buildMatchPercent(recommendation.finalScore);
                         const department = normalizeDepartment(product.department);
                         const fashionMeta = buildFashionMetaLine(product);
+                        const isPromoted =
+                            Boolean(product.isPromoted) ||
+                            Boolean(recommendation.isPromoted) ||
+                            Number(recommendation.paidBoostScore) > 0 ||
+                            Number(product.paidBoostScore) > 0;
                         const reasons = Array.isArray(recommendation.reasons)
                             ? recommendation.reasons.slice(0, 3)
                             : [];
@@ -236,6 +243,11 @@ const RecommendedForYou = ({ variant = 'section' }) => {
                                     <span className={`recommended-department-badge badge-${department}`}>
                                         {getDepartmentLabel(department)}
                                     </span>
+                                    {isPromoted ? (
+                                        <span className="recommended-promoted-badge">
+                                            Promoted
+                                        </span>
+                                    ) : null}
                                     <span className="recommended-match-badge">
                                         <Sparkles size={14} />
                                         {matchPercent}% match
@@ -261,6 +273,11 @@ const RecommendedForYou = ({ variant = 'section' }) => {
                                         {product.category || 'General'} | {getDepartmentLabel(department)}
                                     </p>
                                     {fashionMeta && <p className="recommended-meta">{fashionMeta}</p>}
+                                    {Number(recommendation.paidBoostScore) > 0 ? (
+                                        <p className="recommended-score-note">
+                                            
+                                        </p>
+                                    ) : null}
 
                                     <ul className="recommended-reasons">
                                         {reasons.map((reason) => (
