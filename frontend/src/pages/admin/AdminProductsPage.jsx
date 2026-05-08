@@ -6,7 +6,6 @@ import api from '../../utils/api';
 import { getErrorMessage } from '../../utils/adminUtils';
 
 const getStockStatus = (countInStock) => {
-    const { formatCurrency } = useCurrency();
     const stock = Number(countInStock ?? 0);
 
     if (stock === 0) {
@@ -23,6 +22,7 @@ const getStockStatus = (countInStock) => {
 const isProductActive = (product) => product?.isActive !== false;
 
 const AdminProductsPage = () => {
+    const { formatCurrency } = useCurrency();
     const [searchParams, setSearchParams] = useSearchParams();
     const [products, setProducts] = useState([]);
     const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0, limit: 10 });
