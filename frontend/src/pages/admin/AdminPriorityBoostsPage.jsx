@@ -1,9 +1,9 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Plus, RotateCcw } from 'lucide-react';
 import api from '../../utils/api';
+import { useCurrency } from '../../context/CurrencyContext';
 import {
     formatDate,
-    formatMoney,
     getErrorMessage,
     labelize,
     statusTone,
@@ -18,6 +18,7 @@ const initialFormState = {
 };
 
 const AdminPriorityBoostsPage = () => {
+    const { formatCurrency } = useCurrency();
     const [boosts, setBoosts] = useState([]);
     const [summary, setSummary] = useState(null);
     const [products, setProducts] = useState([]);
@@ -156,11 +157,11 @@ const AdminPriorityBoostsPage = () => {
                 </div>
                 <div className="admin-card admin-stat-card">
                     <span>Total revenue</span>
-                    <strong>{formatMoney(summary?.totalRevenue || 0)}</strong>
+                    <strong>{formatCurrency(summary?.totalRevenue || 0)}</strong>
                 </div>
                 <div className="admin-card admin-stat-card">
                     <span>Active revenue</span>
-                    <strong>{formatMoney(summary?.activeRevenue || 0)}</strong>
+                    <strong>{formatCurrency(summary?.activeRevenue || 0)}</strong>
                 </div>
             </div>
 
@@ -185,7 +186,7 @@ const AdminPriorityBoostsPage = () => {
                             <option value="">Select a product</option>
                             {products.map((product) => (
                                 <option key={product._id} value={product._id}>
-                                    {product.name} | {product.category} | {formatMoney(product.price)}
+                                    {product.name} | {product.category} | {formatCurrency(product.price)}
                                 </option>
                             ))}
                         </select>
@@ -297,13 +298,13 @@ const AdminPriorityBoostsPage = () => {
                                                         {boost.product?.name || 'Unknown product'}
                                                     </div>
                                                     <div className="admin-muted">
-                                                        {formatMoney(boost.product?.price || 0)}
+                                                        {formatCurrency(boost.product?.price || 0)}
                                                     </div>
                                                 </div>
                                             </div>
                                         </td>
                                         <td>{boost.category || boost.product?.category || 'Not set'}</td>
-                                        <td>{formatMoney(boost.feeAmount || 0)}</td>
+                                        <td>{formatCurrency(boost.feeAmount || 0)}</td>
                                         <td>{labelize(boost.placement)}</td>
                                         <td>{formatDate(boost.startsAt)}</td>
                                         <td>{formatDate(boost.endsAt)}</td>
