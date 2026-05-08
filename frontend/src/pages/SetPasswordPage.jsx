@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Lock, Loader } from 'lucide-react';
+import { Lock, Loader, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import api from '../utils/api';
 import '../styles/LoginPage.css';
@@ -8,6 +8,8 @@ import '../styles/LoginPage.css';
 const SetPasswordPage = () => {
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [errorMsg, setErrorMsg] = useState('');
     const [successMsg, setSuccessMsg] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -62,12 +64,21 @@ const SetPasswordPage = () => {
                         <div className="input-wrapper">
                             <Lock className="input-icon" size={20} />
                             <input
-                                type="password"
+                                type={showPassword ? "text" : "password"}
                                 placeholder="Enter password"
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
                                 required
                             />
+                            <button
+                                type="button"
+                                className="toggle-password-btn"
+                                onClick={() => setShowPassword(!showPassword)}
+                                aria-label={showPassword ? "Hide password" : "Show password"}
+                                aria-pressed={showPassword}
+                            >
+                                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                            </button>
                         </div>
                     </div>
 
@@ -76,12 +87,21 @@ const SetPasswordPage = () => {
                         <div className="input-wrapper">
                             <Lock className="input-icon" size={20} />
                             <input
-                                type="password"
+                                type={showConfirmPassword ? "text" : "password"}
                                 placeholder="Confirm password"
                                 value={confirmPassword}
                                 onChange={(e) => setConfirmPassword(e.target.value)}
                                 required
                             />
+                            <button
+                                type="button"
+                                className="toggle-password-btn"
+                                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
+                                aria-pressed={showConfirmPassword}
+                            >
+                                {showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                            </button>
                         </div>
                     </div>
 

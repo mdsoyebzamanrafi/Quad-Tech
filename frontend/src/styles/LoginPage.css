@@ -84,7 +84,7 @@
 
 .input-wrapper input {
     width: 100%;
-    padding: 1rem 1rem 1rem 3.5rem;
+    padding: 1rem 3.5rem 1rem 3.5rem;
     border-radius: 9999px;
     border: 1px solid var(--border-color);
     background-color: var(--bg-primary);
@@ -98,6 +98,32 @@
     outline: none;
     border-color: var(--color-accent-2);
     box-shadow: 0 0 0 4px rgba(139, 92, 246, 0.1);
+}
+
+.toggle-password-btn {
+    position: absolute;
+    right: 0.5rem;
+    background: transparent;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--text-muted);
+    border-radius: 50%;
+    min-width: 44px;
+    min-height: 44px;
+    transition: all 0.2s ease;
+}
+
+.toggle-password-btn:hover {
+    color: var(--text-main);
+    background-color: rgba(139, 92, 246, 0.1);
+}
+
+.toggle-password-btn:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--color-accent-2);
 }
 
 .login-btn {
