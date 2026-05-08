@@ -18,7 +18,7 @@ const AdminFAQPage = () => {
             setLoading(true);
             const { data } = await api.get('/api/faqs');
             setFaqs(data.data || {});
-        } catch (error) {
+        } catch {
             console.error('Failed to fetch FAQs');
         } finally {
             setLoading(false);
@@ -56,7 +56,7 @@ const AdminFAQPage = () => {
         try {
             await api.delete(`/api/faqs/${faqId}`);
             fetchFAQs();
-        } catch (error) {
+        } catch {
             alert('Failed to delete FAQ');
         }
     };

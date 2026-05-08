@@ -419,6 +419,8 @@ const scoreProduct = (rawProduct, context) => {
 
     return {
         product,
+        organicScore: finalScore,
+        paidBoostScore: 0,
         finalScore,
         scoreBreakdown,
         reasons,
