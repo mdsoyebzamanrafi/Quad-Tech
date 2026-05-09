@@ -7,11 +7,13 @@ import '../styles/LoginPage.css';
 const FriendsPage = () => {
     const [friends, setFriends] = useState([]);
     const [pendingRequests, setPendingRequests] = useState([]);
+    const [sentRequests, setSentRequests] = useState([]);
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchLoading, setSearchLoading] = useState(false);
     const [activeTab, setActiveTab] = useState('friends'); // 'friends', 'requests', 'search'
+    const [actionLoading, setActionLoading] = useState(null);
 
     useEffect(() => {
         fetchFriends();
@@ -20,8 +22,9 @@ const FriendsPage = () => {
     const fetchFriends = async () => {
         try {
             const { data } = await api.get('/api/friends');
-            setFriends(data.data.friends);
-            setPendingRequests(data.data.pendingRequests);
+            setFriends(data.data.friends || []);
+            setPendingRequests(data.data.pendingRequests || []);
+            setSentRequests(data.data.sentRequests || []);
         } catch (error) {
             console.error('Failed to fetch friends', error);
         } finally {
@@ -46,21 +49,41 @@ const FriendsPage = () => {
     };
 
     const sendRequest = async (userId) => {
+        if (actionLoading) return;
+        setActionLoading(userId);
         try {
             await api.post('/api/friends', { recipientId: userId });
-            alert('Friend request sent!');
+            await fetchFriends();
         } catch (error) {
             alert(error.response?.data?.message || 'Failed to send request');
+        } finally {
+            setActionLoading(null);
+        }
+    };
+
+    const handleRemoveOrCancel = async (userId) => {
+        if (actionLoading) return;
+        setActionLoading(userId);
+        try {
+            await api.delete(`/api/friends/${userId}`);
+            await fetchFriends();
+        } catch (error) {
+            alert(error.response?.data?.message || 'Action failed');
+        } finally {
+            setActionLoading(null);
         }
     };
 
     const handleRequest = async (friendshipId, action) => {
+        if (actionLoading) return;
+        setActionLoading(friendshipId);
         try {
             await api.put(`/api/friends/request/${friendshipId}`, { action });
-            fetchFriends();
-            alert(`Request ${action}ed`);
+            await fetchFriends();
         } catch {
             alert(`Failed to ${action} request`);
+        } finally {
+            setActionLoading(null);
         }
     };
 
@@ -105,7 +128,7 @@ const FriendsPage = () => {
                     className={`btn ${activeTab === 'requests' ? 'btn-primary' : 'btn-secondary'}`}
                     onClick={() => setActiveTab('requests')}
                 >
-                    Requests ({pendingRequests.length})
+                    Requests ({pendingRequests.length + sentRequests.length})
                 </button>
                 {activeTab === 'search' && (
                     <button className="btn btn-primary">Search Results</button>
@@ -123,17 +146,27 @@ const FriendsPage = () => {
                                             <h3 style={{ color: 'var(--text-main)', margin: 0 }}>{friend.name}</h3>
                                             <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', margin: '0.2rem 0 0' }}>{friend.email}</p>
                                         </div>
-                                        <Link
-                                            to="/gift-assistant"
-                                            state={{
-                                                enableFriendWishlist: true,
-                                                prefillFriendIdentifier: friend.email || friend.name || '',
-                                            }}
-                                            className="btn btn-secondary"
-                                            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
-                                        >
-                                            <Gift size={16} /> Find Gift
-                                        </Link>
+                                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                            <Link
+                                                to="/gift-assistant"
+                                                state={{
+                                                    enableFriendWishlist: true,
+                                                    prefillFriendIdentifier: friend.email || friend.name || '',
+                                                }}
+                                                className="btn btn-secondary"
+                                                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                                            >
+                                                <Gift size={16} /> Find Gift
+                                            </Link>
+                                            <button 
+                                                className="btn btn-outline" 
+                                                onClick={() => handleRemoveOrCancel(friend._id)} 
+                                                disabled={actionLoading === friend._id}
+                                                style={{ borderColor: 'var(--error)', color: 'var(--error)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                                            >
+                                                <X size={16} /> Remove Friend
+                                            </button>
+                                        </div>
                                     </div>
                                 ))}
                             </div>
@@ -143,20 +176,33 @@ const FriendsPage = () => {
 
                 {activeTab === 'requests' && (
                     <div>
-                        {pendingRequests.length === 0 ? <p>No pending friend requests.</p> : (
+                        {pendingRequests.length === 0 && sentRequests.length === 0 ? <p>No pending friend requests.</p> : (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                                 {pendingRequests.map(req => (
                                     <div key={req.friendshipId} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
                                         <div>
                                             <h3 style={{ color: 'var(--text-main)', margin: 0 }}>{req.user.name}</h3>
-                                            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', margin: '0.2rem 0 0' }}>{req.user.email}</p>
+                                            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', margin: '0.2rem 0 0' }}>{req.user.email} <span style={{ fontSize: '0.8rem', color: 'var(--accent-1)', marginLeft: '0.5rem' }}>(Received)</span></p>
                                         </div>
                                         <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                            <button className="btn btn-primary" onClick={() => handleRequest(req.friendshipId, 'accept')} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                            <button className="btn btn-primary" onClick={() => handleRequest(req.friendshipId, 'accept')} disabled={actionLoading === req.friendshipId} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                                 <Check size={16} /> Accept
                                             </button>
-                                            <button className="btn btn-secondary" onClick={() => handleRequest(req.friendshipId, 'reject')} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--error)' }}>
-                                                <X size={16} /> Reject
+                                            <button className="btn btn-outline" onClick={() => handleRequest(req.friendshipId, 'reject')} disabled={actionLoading === req.friendshipId} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', borderColor: 'var(--error)', color: 'var(--error)' }}>
+                                                <X size={16} /> Decline
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                                {sentRequests.map(req => (
+                                    <div key={req.friendshipId} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+                                        <div>
+                                            <h3 style={{ color: 'var(--text-main)', margin: 0 }}>{req.user.name}</h3>
+                                            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', margin: '0.2rem 0 0' }}>{req.user.email} <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginLeft: '0.5rem' }}>(Sent)</span></p>
+                                        </div>
+                                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                            <button className="btn btn-outline" onClick={() => handleRemoveOrCancel(req.user._id)} disabled={actionLoading === req.user._id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                <X size={16} /> Cancel Request
                                             </button>
                                         </div>
                                     </div>
@@ -170,17 +216,75 @@ const FriendsPage = () => {
                     <div>
                         {searchResults.length === 0 ? <p>No users found matching "{searchQuery}"</p> : (
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                                {searchResults.map(user => (
-                                    <div key={user._id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
-                                        <div>
-                                            <h3 style={{ color: 'var(--text-main)', margin: 0 }}>{user.name}</h3>
-                                            <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', margin: '0.2rem 0 0' }}>{user.email}</p>
+                                {searchResults.map(user => {
+                                    const isFriend = friends.some(f => f._id === user._id);
+                                    const hasSent = sentRequests.some(r => r.user._id === user._id);
+                                    const hasReceived = pendingRequests.some(r => r.user._id === user._id);
+                                    
+                                    return (
+                                        <div key={user._id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '1rem', background: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+                                            <div>
+                                                <h3 style={{ color: 'var(--text-main)', margin: 0 }}>{user.name}</h3>
+                                                <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', margin: '0.2rem 0 0' }}>{user.email}</p>
+                                            </div>
+                                            <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                                {isFriend ? (
+                                                    <>
+                                                        <Link
+                                                            to="/gift-assistant"
+                                                            state={{
+                                                                enableFriendWishlist: true,
+                                                                prefillFriendIdentifier: user.email || user.name || '',
+                                                            }}
+                                                            className="btn btn-secondary"
+                                                            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                                                        >
+                                                            <Gift size={16} /> Find Gift
+                                                        </Link>
+                                                        <button 
+                                                            className="btn btn-outline" 
+                                                            onClick={() => handleRemoveOrCancel(user._id)} 
+                                                            disabled={actionLoading === user._id}
+                                                            style={{ borderColor: 'var(--error)', color: 'var(--error)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                                                        >
+                                                            <X size={16} /> Remove Friend
+                                                        </button>
+                                                    </>
+                                                ) : hasSent ? (
+                                                    <button 
+                                                        className="btn btn-outline" 
+                                                        onClick={() => handleRemoveOrCancel(user._id)} 
+                                                        disabled={actionLoading === user._id}
+                                                        style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                                                    >
+                                                        <X size={16} /> Cancel Request
+                                                    </button>
+                                                ) : hasReceived ? (
+                                                    <button 
+                                                        className="btn btn-primary" 
+                                                        onClick={() => {
+                                                            const req = pendingRequests.find(r => r.user._id === user._id);
+                                                            if (req) handleRequest(req.friendshipId, 'accept');
+                                                        }} 
+                                                        disabled={actionLoading === user._id}
+                                                        style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                                                    >
+                                                        <Check size={16} /> Accept Request
+                                                    </button>
+                                                ) : (
+                                                    <button 
+                                                        className="btn btn-primary" 
+                                                        onClick={() => sendRequest(user._id)} 
+                                                        disabled={actionLoading === user._id}
+                                                        style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+                                                    >
+                                                        <UserPlus size={16} /> Add Friend
+                                                    </button>
+                                                )}
+                                            </div>
                                         </div>
-                                        <button className="btn btn-primary" onClick={() => sendRequest(user._id)} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                            <UserPlus size={16} /> Add Friend
-                                        </button>
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         )}
                     </div>

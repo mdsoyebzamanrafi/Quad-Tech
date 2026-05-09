@@ -47,9 +47,16 @@ const buildSalesOrderMatch = ({ startDate = null, endDate = null } = {}) => {
     return match;
 };
 
+/**
+ * @desc    Get aggregate sales summary including total revenue, orders, and discounts
+ * @route   GET /api/sales/summary
+ * @access  Private/Admin
+ */
 const getSalesSummary = asyncHandler(async (req, res) => {
+    // Define criteria for "valid" sales: Paid orders that are not cancelled or failed
     const match = buildSalesOrderMatch();
 
+    // Use MongoDB aggregation to sum financial metrics from all matching orders
     const [summary] = await Order.aggregate([
         { $match: match },
         {
@@ -65,6 +72,7 @@ const getSalesSummary = asyncHandler(async (req, res) => {
         },
     ]);
 
+    // Aggregate quantity of individual products sold
     const [itemsSummary] = await OrderItem.aggregate([
         {
             $lookup: {
@@ -99,11 +107,19 @@ const getSalesSummary = asyncHandler(async (req, res) => {
     });
 });
 
+
+/**
+ * @desc    Get revenue and order count grouped by day for charts
+ * @route   GET /api/sales/daily
+ * @access  Private/Admin
+ */
 const getDailySales = asyncHandler(async (req, res) => {
+    // Filter by date range if provided in query params
     const startDate = normalizeRangeBoundary(req.query.startDate, 'startDate');
     const endDate = normalizeRangeBoundary(req.query.endDate, 'endDate');
     const match = buildSalesOrderMatch({ startDate, endDate });
 
+    // Group orders by date (string format YYYY-MM-DD) and sum metrics
     const results = await Order.aggregate([
         { $match: match },
         {
@@ -131,6 +147,7 @@ const getDailySales = asyncHandler(async (req, res) => {
         discount: roundPrice(item.discount),
     })));
 });
+
 
 const getProductSales = asyncHandler(async (req, res) => {
     const results = await OrderItem.aggregate([

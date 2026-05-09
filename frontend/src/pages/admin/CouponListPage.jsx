@@ -1,10 +1,12 @@
+import { useCurrency } from '../../context/CurrencyContext';
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Pencil, Plus, Power, RotateCcw } from 'lucide-react';
 import api from '../../utils/api';
-import { formatDateTime, formatMoney, getErrorMessage, labelize } from '../../utils/adminUtils';
+import { formatDateTime, getErrorMessage, labelize } from '../../utils/adminUtils';
 
 const CouponListPage = () => {
+    const { formatCurrency } = useCurrency();
     const [coupons, setCoupons] = useState([]);
     const [loading, setLoading] = useState(true);
     const [actionLoading, setActionLoading] = useState('');
@@ -101,10 +103,10 @@ const CouponListPage = () => {
                                         <td>
                                             {coupon.discountType === 'percentage'
                                                 ? `${coupon.discountValue}%`
-                                                : formatMoney(coupon.discountValue)}
+                                                : formatCurrency(coupon.discountValue)}
                                         </td>
-                                        <td>{formatMoney(coupon.minimumOrderAmount || 0)}</td>
-                                        <td>{coupon.maxDiscountAmount ? formatMoney(coupon.maxDiscountAmount) : 'No cap'}</td>
+                                        <td>{formatCurrency(coupon.minimumOrderAmount || 0)}</td>
+                                        <td>{coupon.maxDiscountAmount ? formatCurrency(coupon.maxDiscountAmount) : 'No cap'}</td>
                                         <td>{coupon.usedCount || 0}</td>
                                         <td>{coupon.usageLimit || 'Unlimited'}</td>
                                         <td>{formatDateTime(coupon.expiresAt)}</td>

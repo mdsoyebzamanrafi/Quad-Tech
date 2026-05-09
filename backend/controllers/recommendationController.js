@@ -1,4 +1,5 @@
 import { getPersonalRecommendations as getPersonalRecommendationsService } from '../services/personalRecommendationService.js';
+import { getImageSearchRecommendations as getImageSearchRecommendationsService } from '../services/imageSearchRecommendationService.js';
 import { getPromptRecommendations as getPromptRecommendationsService } from '../services/promptRecommendationService.js';
 
 const getPersonalRecommendations = async (req, res) => {
@@ -61,4 +62,43 @@ const getPromptRecommendations = async (req, res) => {
     }
 };
 
-export { getPersonalRecommendations, getPromptRecommendations };
+const getImageSearchRecommendations = async (req, res) => {
+    if (!req.file) {
+        return res.status(400).json({
+            success: false,
+            message: 'Image is required for image search.',
+        });
+    }
+
+    try {
+        const result = await getImageSearchRecommendationsService({
+            userId: req.user?._id || null,
+            imageBuffer: req.file.buffer,
+            mimeType: req.file.mimetype,
+        });
+
+        res.json({
+            success: true,
+            intent: result.intent,
+            contextSummary: result.contextSummary,
+            fallbackUsed: result.fallbackUsed,
+            message: result.message,
+            products: result.products,
+        });
+    } catch (error) {
+        console.error('Image search recommendation error:', error);
+
+        const statusCode = error.statusCode && Number.isInteger(error.statusCode) ? error.statusCode : 502;
+        const message =
+            statusCode >= 500
+                ? 'Image search analysis is unavailable right now. Please try again.'
+                : error.message || 'Could not analyze that image.';
+
+        res.status(statusCode).json({
+            success: false,
+            message,
+        });
+    }
+};
+
+export { getPersonalRecommendations, getPromptRecommendations, getImageSearchRecommendations };

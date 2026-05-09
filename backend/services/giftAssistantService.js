@@ -1,7 +1,16 @@
 import Product from '../models/Product.js';
 import { parseGiftContext } from './giftContextParser.js';
 import { getBangladeshOccasionContext } from './bangladeshOccasionService.js';
-import { scoreGiftProduct } from './giftRecommendationScoringService.js';
+import { getRelationshipProfile, scoreGiftProduct } from './giftRecommendationScoringService.js';
+import {
+    applyPriorityQuotaToRecommendations,
+    calculatePaidBoostForProduct,
+    collectCategories,
+    getActiveBoostMapForProducts,
+    getActiveBoostedProductsForRelevantCategories,
+} from './priorityBoostService.js';
+
+const GIFT_RECOMMENDATION_LIMIT = 10;
 
 const ACTIVE_GIFT_PRODUCT_FILTER = {
     countInStock: { $gt: 0 },
@@ -21,6 +30,11 @@ const toNumber = (value) => {
     const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : 0;
 };
+
+const getRecommendationProductId = (recommendation) =>
+    String(recommendation?.product?._id || '');
+
+const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
 const hasNumericValue = (value) =>
     value !== null &&
@@ -54,6 +68,12 @@ const serializeGiftProduct = (product = {}) => ({
     adminPriorityScore: toNumber(product.adminPriorityScore),
     isSponsored: Boolean(product.isSponsored),
     sponsoredWeight: toNumber(product.sponsoredWeight),
+    isActive: product.isActive !== false,
+    createdAt: product.createdAt || null,
+    updatedAt: product.updatedAt || null,
+    isPromoted: Boolean(product.isPromoted),
+    paidBoostScore: toNumber(product.paidBoostScore),
+    promotionLabel: normalizeString(product.promotionLabel),
 });
 
 const formatTaka = (amount) => `$${Math.round(Number(amount) || 0)}`;
@@ -99,7 +119,10 @@ const buildFallbackReply = (giftContext, recommendations) => {
     return `I found a few thoughtful gift options for ${buildRecipientPhrase(giftContext)}${buildBudgetPhrase(giftContext)}. These are real in-stock Quad Tech products ranked by gift suitability, occasion fit, and budget.`;
 };
 
-const applyRecommendationDiversity = (recommendations, limit = 5) => {
+const applyRecommendationDiversity = (
+    recommendations,
+    limit = GIFT_RECOMMENDATION_LIMIT
+) => {
     const selected = [];
     const seenNames = new Set();
     const categoryCounts = new Map();
@@ -139,6 +162,203 @@ const applyRecommendationDiversity = (recommendations, limit = 5) => {
     }
 
     return selected.slice(0, limit);
+};
+
+const buildGiftPriorityRelevantCategories = ({
+    giftContext = {},
+    relationshipProfile = {},
+    occasionCategories = [],
+    extraContext = {},
+} = {}) => {
+    const directContextCategories = collectCategories(
+        giftContext?.preferredCategories,
+        extraContext?.friendWishlistCategories,
+        extraContext?.friendWishlistProducts,
+        extraContext?.wishlistProducts
+    );
+
+    if (directContextCategories.length > 0) {
+        return directContextCategories;
+    }
+
+    const occasionDrivenCategories = collectCategories(occasionCategories);
+
+    if (occasionDrivenCategories.length > 0) {
+        return occasionDrivenCategories;
+    }
+
+    return collectCategories(
+        relationshipProfile.categories,
+        extraContext?.similarWishlistCategories,
+        giftContext?.preferredCategories,
+        occasionCategories,
+        extraContext?.friendWishlistCategories,
+        extraContext?.friendWishlistProducts,
+        extraContext?.wishlistProducts
+    );
+};
+
+const buildGiftBoostContext = (giftContext = {}, occasionContext = {}, extraContext = {}) => {
+    const relationshipProfile = getRelationshipProfile(giftContext) || {};
+    const occasionCategories = Array.isArray(occasionContext?.activeOccasion?.recommendedCategories)
+        ? occasionContext.activeOccasion.recommendedCategories
+        : [];
+    const relevantCategories = collectCategories(
+        giftContext?.preferredCategories,
+        relationshipProfile.categories,
+        occasionCategories,
+        extraContext?.friendWishlistCategories,
+        extraContext?.similarWishlistCategories,
+        extraContext?.friendWishlistProducts,
+        extraContext?.wishlistProducts
+    );
+    const priorityRelevantCategories = buildGiftPriorityRelevantCategories({
+        giftContext,
+        relationshipProfile,
+        occasionCategories,
+        extraContext,
+    });
+
+    return {
+        ...giftContext,
+        ...extraContext,
+        giftContext,
+        preferredCategories: giftContext?.preferredCategories || [],
+        relationshipCategories: relationshipProfile.categories || [],
+        occasionCategories,
+        relevantCategories,
+        priorityRelevantCategories,
+    };
+};
+
+const buildGiftRecommendation = ({
+    product,
+    scoreResult,
+    boostMap,
+    boostContext,
+}) => {
+    const organicScore = Number(
+        scoreResult?.scoreBreakdown?.totalBeforeClamp ?? scoreResult?.giftScore ?? 0
+    );
+    const paidBoost = calculatePaidBoostForProduct({
+        product,
+        boostMap,
+        options: {
+            context: boostContext,
+            mode: 'gift',
+            organicScore,
+            relevantCategories:
+                boostContext?.priorityRelevantCategories || boostContext?.relevantCategories,
+        },
+    });
+    const paidBoostScore = Number(paidBoost.paidBoostScore) || 0;
+    const finalScore = organicScore + paidBoostScore;
+    const giftScore = clamp(Math.round(finalScore), 0, 100);
+    const reasons = Array.isArray(scoreResult?.reasons) ? [...scoreResult.reasons] : [];
+
+    if (paidBoost.reason && !reasons.includes(paidBoost.reason)) {
+        reasons.push(paidBoost.reason);
+    }
+
+    return {
+        product: {
+            ...serializeGiftProduct(product),
+            isPromoted: Boolean(paidBoost.isPromoted),
+            paidBoostScore,
+            promotionLabel: paidBoost.promotionLabel || '',
+        },
+        organicScore,
+        paidBoostScore,
+        finalScore,
+        giftScore,
+        reasons,
+        scoreBreakdown: {
+            ...(scoreResult?.scoreBreakdown || {}),
+            paidBoostScore,
+        },
+        isPromoted: Boolean(paidBoost.isPromoted),
+        promotionLabel: paidBoost.promotionLabel || '',
+    };
+};
+
+const getGiftRecommendationRating = (recommendation) =>
+    Number(recommendation?.product?.rating ?? recommendation?.product?.averageRating ?? 0);
+
+const getGiftRecommendationTimestamp = (recommendation) =>
+    new Date(recommendation?.product?.createdAt || recommendation?.product?.updatedAt || 0).getTime() || 0;
+
+const sortGiftRecommendations = (recommendations) =>
+    [...recommendations].sort((firstRecommendation, secondRecommendation) => {
+        const finalScoreDifference =
+            Number(secondRecommendation.finalScore || secondRecommendation.giftScore || 0) -
+            Number(firstRecommendation.finalScore || firstRecommendation.giftScore || 0);
+
+        if (finalScoreDifference !== 0) {
+            return finalScoreDifference;
+        }
+
+        const organicScoreDifference =
+            Number(secondRecommendation.organicScore || 0) - Number(firstRecommendation.organicScore || 0);
+
+        if (organicScoreDifference !== 0) {
+            return organicScoreDifference;
+        }
+
+        const paidBoostDifference =
+            Number(secondRecommendation.paidBoostScore || 0) - Number(firstRecommendation.paidBoostScore || 0);
+
+        if (paidBoostDifference !== 0) {
+            return paidBoostDifference;
+        }
+
+        const ratingDifference =
+            getGiftRecommendationRating(secondRecommendation) -
+            getGiftRecommendationRating(firstRecommendation);
+
+        if (ratingDifference !== 0) {
+            return ratingDifference;
+        }
+
+        return getGiftRecommendationTimestamp(secondRecommendation) - getGiftRecommendationTimestamp(firstRecommendation);
+    });
+
+const buildRelevantPromotedProductIds = (
+    recommendations = [],
+    allowedPromotedProductIds = []
+) => {
+    const allowedPromotedProductIdSet = new Set(
+        (Array.isArray(allowedPromotedProductIds) ? allowedPromotedProductIds : [])
+            .map((productId) => String(productId || ''))
+            .filter(Boolean)
+    );
+
+    return Array.from(
+        new Set(
+            (Array.isArray(recommendations) ? recommendations : [])
+                .filter((recommendation) => {
+                    const productId = getRecommendationProductId(recommendation);
+
+                    if (!productId) {
+                        return false;
+                    }
+
+                    if (
+                        allowedPromotedProductIdSet.size > 0 &&
+                        !allowedPromotedProductIdSet.has(productId)
+                    ) {
+                        return false;
+                    }
+
+                    return (
+                        Number(recommendation?.paidBoostScore || 0) > 0 ||
+                        Boolean(recommendation?.isPromoted) ||
+                        Boolean(recommendation?.product?.isPromoted)
+                    );
+                })
+                .map((recommendation) => getRecommendationProductId(recommendation))
+                .filter(Boolean)
+        )
+    );
 };
 
 const buildOllamaPrompt = ({ message, giftContext, occasionContext, recommendations }) => {
@@ -263,38 +483,58 @@ const getGiftAssistantRecommendations = async (message) => {
     const trimmedMessage = message.trim();
     const giftContext = parseGiftContext(trimmedMessage);
     const occasionContext = getBangladeshOccasionContext(giftContext);
+    const boostContext = buildGiftBoostContext(giftContext, occasionContext);
+    const relevantBoostedProducts = await getActiveBoostedProductsForRelevantCategories({
+        categories: boostContext.priorityRelevantCategories || boostContext.relevantCategories,
+        placement: 'gift',
+        limit: 20,
+    });
+    const relevantBoostedProductIds = relevantBoostedProducts
+        .map((entry) => String(entry?.product?._id || ''))
+        .filter(Boolean);
 
     const products = await Product.find(ACTIVE_GIFT_PRODUCT_FILTER).lean();
+    const boostMap = await getActiveBoostMapForProducts(
+        products.map((product) => product._id),
+        'gift'
+    );
 
     const scoredRecommendations = products.map((product) => {
         const scoreResult = scoreGiftProduct(product, giftContext, occasionContext);
 
-        return {
-            product: serializeGiftProduct(product),
-            giftScore: scoreResult.giftScore,
-            reasons: scoreResult.reasons,
-            scoreBreakdown: scoreResult.scoreBreakdown,
-        };
+        return buildGiftRecommendation({
+            product,
+            scoreResult,
+            boostMap,
+            boostContext,
+        });
     });
 
     const positiveRecommendations = scoredRecommendations.filter(
-        (recommendation) => recommendation.giftScore > 0
+        (recommendation) => Number(recommendation.finalScore ?? recommendation.giftScore) > 0
     );
     const workingRecommendations =
-        positiveRecommendations.length >= 5 ? positiveRecommendations : scoredRecommendations;
+        positiveRecommendations.length >= GIFT_RECOMMENDATION_LIMIT
+            ? positiveRecommendations
+            : scoredRecommendations;
 
-    const sortedRecommendations = [...workingRecommendations].sort((firstRecommendation, secondRecommendation) => {
-        if (secondRecommendation.giftScore !== firstRecommendation.giftScore) {
-            return secondRecommendation.giftScore - firstRecommendation.giftScore;
-        }
+    const sortedRecommendations = sortGiftRecommendations(workingRecommendations);
+    const promotedRelevantProductIds = buildRelevantPromotedProductIds(
+        sortedRecommendations,
+        relevantBoostedProductIds
+    );
 
-        return (
-            Number(secondRecommendation.scoreBreakdown?.totalBeforeClamp || 0) -
-            Number(firstRecommendation.scoreBreakdown?.totalBeforeClamp || 0)
-        );
+    const diversifiedRecommendations = applyRecommendationDiversity(
+        sortedRecommendations,
+        GIFT_RECOMMENDATION_LIMIT
+    );
+    const recommendations = applyPriorityQuotaToRecommendations({
+        recommendations: diversifiedRecommendations,
+        rankedRecommendations: sortedRecommendations,
+        finalLimit: GIFT_RECOMMENDATION_LIMIT,
+        mode: 'gift',
+        promotedProductIds: promotedRelevantProductIds,
     });
-
-    const recommendations = applyRecommendationDiversity(sortedRecommendations, 5);
     const fallbackReply = buildFallbackReply(giftContext, recommendations);
     const ollamaReply = await generateOllamaGiftReply({
         message: trimmedMessage,
@@ -314,7 +554,9 @@ const getGiftAssistantRecommendations = async (message) => {
 
 export {
     ACTIVE_GIFT_PRODUCT_FILTER,
+    GIFT_RECOMMENDATION_LIMIT,
     serializeGiftProduct,
     applyRecommendationDiversity,
+    buildGiftBoostContext,
     getGiftAssistantRecommendations,
 };

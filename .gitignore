@@ -9,9 +9,9 @@ frontend/dist/
 backend/dist/
 
 # Env files
-# .env
-# backend/.env
-# frontend/.env
+.env
+backend/.env
+frontend/.env
 *.local
 
 # Logs
@@ -33,3 +33,5 @@ Quad-Tech/
 *.njsproj
 *.sln
 *.sw?
+backend/.env
+backend/.env

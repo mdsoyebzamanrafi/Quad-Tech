@@ -89,6 +89,13 @@ const buildProductLikeShape = (product = {}) => ({
     adminPriorityScore: toNumericValue(product.adminPriorityScore),
     isSponsored: Boolean(product.isSponsored),
     sponsoredWeight: toNumericValue(product.sponsoredWeight),
+    isActive: product.isActive !== false,
+    createdAt: product.createdAt || null,
+    updatedAt: product.updatedAt || null,
+    user: product.user || null,
+    isPromoted: Boolean(product.isPromoted),
+    paidBoostScore: toNumericValue(product.paidBoostScore),
+    promotionLabel: normalizeString(product.promotionLabel),
 });
 
 const normalizeCountMap = (countMap, value, weight) => {

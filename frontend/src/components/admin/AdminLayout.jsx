@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
-import { BarChart3, ClipboardList, HelpCircle, LayoutDashboard, Package, Percent, ShieldCheck, TicketPercent, Users } from 'lucide-react';
+import { BarChart3, ClipboardList, HelpCircle, LayoutDashboard, Package, Percent, ShieldCheck, Sparkles, TicketPercent, Users } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import '../../styles/Admin.css';
 
@@ -26,6 +26,10 @@ const AdminLayout = () => {
                     <NavLink to="/admin/products" className={({ isActive }) => `admin-nav-link ${isActive ? 'active' : ''}`}>
                         <Package size={18} />
                         Products
+                    </NavLink>
+                    <NavLink to="/admin/priority-boosts" className={({ isActive }) => `admin-nav-link ${isActive ? 'active' : ''}`}>
+                        <Sparkles size={18} />
+                        Priority Boosts
                     </NavLink>
                     <NavLink to="/admin/coupons" className={({ isActive }) => `admin-nav-link ${isActive ? 'active' : ''}`}>
                         <TicketPercent size={18} />
@@ -55,6 +59,19 @@ const AdminLayout = () => {
                         Role management enabled
                     </div>
                 )}
+                
+                <div style={{ marginTop: 'auto', padding: '1rem' }}>
+                    <button 
+                        className="btn btn-outline" 
+                        style={{ width: '100%' }}
+                        onClick={() => {
+                            localStorage.setItem('adminViewMode', 'customer');
+                            window.location.href = '/';
+                        }}
+                    >
+                        View as Customer
+                    </button>
+                </div>
             </aside>
 
             <div className="admin-content">

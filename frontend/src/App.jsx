@@ -1,6 +1,6 @@
 import React from 'react';
 import { GoogleOAuthProvider } from '@react-oauth/google';
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import ScrollToTop from './components/ScrollToTop';
 import Layout from './components/Layout';
 import HomePage from './pages/HomePage';
@@ -40,8 +40,10 @@ import AdminDiscountsPage from './pages/admin/AdminDiscountsPage';
 import SalesDashboardPage from './pages/admin/SalesDashboardPage';
 import AdminProductsPage from './pages/admin/AdminProductsPage';
 import AdminProductFormPage from './pages/admin/AdminProductFormPage';
+import AdminPriorityBoostsPage from './pages/admin/AdminPriorityBoostsPage';
 import { ThemeProvider } from './context/ThemeContext';
 import { useAuth } from './context/AuthContext';
+import { CurrencyProvider } from './context/CurrencyContext';
 
 const RequirePassword = ({ children }) => {
   const { userInfo } = useAuth();
@@ -54,6 +56,19 @@ const RequirePassword = ({ children }) => {
 };
 
 function AppContent() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { userInfo } = useAuth();
+
+  React.useEffect(() => {
+    if (userInfo && (userInfo.role === 'admin' || userInfo.role === 'super_admin')) {
+      const viewMode = localStorage.getItem('adminViewMode');
+      if (viewMode !== 'customer' && !location.pathname.startsWith('/admin')) {
+        navigate('/admin', { replace: true });
+      }
+    }
+  }, [userInfo, location.pathname, navigate]);
+
   return (
     <Layout>
       <RequirePassword>
@@ -95,6 +110,7 @@ function AppContent() {
             <Route path="products" element={<AdminProductsPage />} />
             <Route path="products/new" element={<AdminProductFormPage />} />
             <Route path="products/:id" element={<AdminProductFormPage />} />
+            <Route path="priority-boosts" element={<AdminPriorityBoostsPage />} />
             <Route path="coupons" element={<CouponListPage />} />
             <Route path="discounts" element={<AdminDiscountsPage />} />
             <Route path="coupon/create" element={<CouponCreatePage />} />
@@ -114,10 +130,12 @@ function App() {
   return (
     <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID || 'fallback-id'}>
       <ThemeProvider>
-        <Router>
-          <ScrollToTop />
-          <AppContent />
-        </Router>
+        <CurrencyProvider>
+          <Router>
+            <ScrollToTop />
+            <AppContent />
+          </Router>
+        </CurrencyProvider>
       </ThemeProvider>
     </GoogleOAuthProvider>
   );

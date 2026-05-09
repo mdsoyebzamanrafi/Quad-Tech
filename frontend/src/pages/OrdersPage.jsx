@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Package } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useCurrency } from '../context/CurrencyContext';
 import api from '../utils/api';
 import '../styles/LoginPage.css';
 import { getProductOptionSummary } from '../utils/productUtils';
@@ -91,6 +92,7 @@ const OrdersPage = () => {
     const [orders, setOrders] = useState([]);
 
     const { userInfo } = useAuth();
+    const { formatCurrency } = useCurrency();
     const navigate = useNavigate();
 
     const getMyOrders = async () => {
@@ -196,12 +198,12 @@ const OrdersPage = () => {
                                                     </div>
                                                 </td>
                                                 <td style={{ padding: '1rem 0' }}>{order.createdAt.substring(0, 10)}</td>
-                                                <td style={{ padding: '1rem 0' }}>${(item.price * item.qty).toFixed(2)}</td>
+                                                <td style={{ padding: '1rem 0' }}>{formatCurrency(item.price * item.qty)}</td>
                                                 <td style={{ padding: '1rem 0' }}>
                                                     <span style={{ color: getOrderStatusColor(status), fontWeight: 600 }}>{statusLabel}</span>
                                                 </td>
                                                 <td style={{ padding: '1rem 0' }}>
-                                                    <div>${Number(order.totalDiscount || order.discount || 0).toFixed(2)}</div>
+                                                    <div>{formatCurrency(order.totalDiscount || order.discount || 0)}</div>
                                                     <Link to={`/order/${order._id}`} style={{ color: 'var(--accent-1)', fontSize: '0.85rem' }}>
                                                         View details
                                                     </Link>

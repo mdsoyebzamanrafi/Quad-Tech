@@ -7,13 +7,23 @@ import { getBangladeshOccasionContext } from './bangladeshOccasionService.js';
 import { scoreGiftProduct } from './giftRecommendationScoringService.js';
 import {
     ACTIVE_GIFT_PRODUCT_FILTER,
+    GIFT_RECOMMENDATION_LIMIT,
     applyRecommendationDiversity,
+    buildGiftBoostContext,
     serializeGiftProduct,
 } from './giftAssistantService.js';
+import {
+    applyPriorityQuotaToRecommendations,
+    calculatePaidBoostForProduct,
+    collectCategories,
+    getActiveBoostMapForProducts,
+    getActiveBoostedProductsForRelevantCategories,
+} from './priorityBoostService.js';
 
 const FRIEND_SOURCE_PRIORITY = {
-    friend_wishlist: 3,
-    similar_to_wishlist: 2,
+    friend_wishlist: 4,
+    similar_to_wishlist: 3,
+    promoted_relevant_category: 2,
     general_catalog: 1,
 };
 
@@ -37,6 +47,8 @@ const toNumber = (value) => {
     const parsed = Number(value);
     return Number.isFinite(parsed) ? parsed : 0;
 };
+
+const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
 const escapeRegExp = (value) => String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -72,10 +84,27 @@ const buildSafeFriendShape = (friendUser = {}, identifierField = null) => ({
 
 const getRecommendationId = (recommendation) => String(recommendation?.product?._id || '');
 
+const getProductId = (product) => String(product?._id || '');
+
 const isCatalogEligibleProduct = (product) =>
     Boolean(product) &&
     toNumber(product.countInStock) > 0 &&
     (product.isActive === true || product.isActive === undefined);
+
+const dedupeProductsById = (products = []) => {
+    const seenProductIds = new Set();
+
+    return (Array.isArray(products) ? products : []).filter((product) => {
+        const productId = getProductId(product);
+
+        if (!productId || seenProductIds.has(productId)) {
+            return false;
+        }
+
+        seenProductIds.add(productId);
+        return true;
+    });
+};
 
 const findFriendUserByIdentifier = async (friendIdentifier) => {
     const trimmedIdentifier = normalizeString(friendIdentifier);
@@ -265,23 +294,77 @@ const scoreWishlistAwareProduct = ({
     };
 };
 
+const compareRecommendations = (firstRecommendation, secondRecommendation) => {
+    const firstPriority = FRIEND_SOURCE_PRIORITY[firstRecommendation.recommendationSource] || 0;
+    const secondPriority = FRIEND_SOURCE_PRIORITY[secondRecommendation.recommendationSource] || 0;
+
+    if (secondPriority !== firstPriority) {
+        return secondPriority - firstPriority;
+    }
+
+    const finalScoreDifference =
+        Number(secondRecommendation.finalScore || secondRecommendation.giftScore || 0) -
+        Number(firstRecommendation.finalScore || firstRecommendation.giftScore || 0);
+
+    if (finalScoreDifference !== 0) {
+        return finalScoreDifference;
+    }
+
+    const organicScoreDifference =
+        Number(secondRecommendation.organicScore || 0) - Number(firstRecommendation.organicScore || 0);
+
+    if (organicScoreDifference !== 0) {
+        return organicScoreDifference;
+    }
+
+    const paidBoostDifference =
+        Number(secondRecommendation.paidBoostScore || 0) - Number(firstRecommendation.paidBoostScore || 0);
+
+    if (paidBoostDifference !== 0) {
+        return paidBoostDifference;
+    }
+
+    const ratingDifference =
+        Number(secondRecommendation.product?.rating || 0) -
+        Number(firstRecommendation.product?.rating || 0);
+
+    if (ratingDifference !== 0) {
+        return ratingDifference;
+    }
+
+    return (
+        new Date(secondRecommendation.product?.createdAt || secondRecommendation.product?.updatedAt || 0).getTime() -
+        new Date(firstRecommendation.product?.createdAt || firstRecommendation.product?.updatedAt || 0).getTime()
+    );
+};
+
 const sortRecommendations = (recommendations) =>
-    [...recommendations].sort((firstRecommendation, secondRecommendation) => {
-        const firstPriority = FRIEND_SOURCE_PRIORITY[firstRecommendation.recommendationSource] || 0;
-        const secondPriority = FRIEND_SOURCE_PRIORITY[secondRecommendation.recommendationSource] || 0;
+    [...recommendations].sort(compareRecommendations);
 
-        if (secondPriority !== firstPriority) {
-            return secondPriority - firstPriority;
-        }
+const buildRelevantPromotedProductIds = (recommendations = []) =>
+    Array.from(
+        new Set(
+            (Array.isArray(recommendations) ? recommendations : [])
+                .filter(
+                    (recommendation) =>
+                        Number(recommendation?.paidBoostScore || 0) > 0 ||
+                        Boolean(recommendation?.isPromoted) ||
+                        Boolean(recommendation?.product?.isPromoted)
+                )
+                .map((recommendation) => getRecommendationId(recommendation))
+                .filter(Boolean)
+        )
+    );
 
-        if (secondRecommendation.giftScore !== firstRecommendation.giftScore) {
-            return secondRecommendation.giftScore - firstRecommendation.giftScore;
-        }
-
-        return (
-            Number(secondRecommendation.scoreBreakdown?.totalBeforeClamp || 0) -
-            Number(firstRecommendation.scoreBreakdown?.totalBeforeClamp || 0)
-        );
+const applyFriendWishlistPriorityQuota = (recommendations, rankedRecommendations) =>
+    applyPriorityQuotaToRecommendations({
+        recommendations,
+        rankedRecommendations,
+        finalLimit: GIFT_RECOMMENDATION_LIMIT,
+        mode: 'gift',
+        protectedSources: ['friend_wishlist'],
+        promotedProductIds: buildRelevantPromotedProductIds(rankedRecommendations),
+        sortComparator: compareRecommendations,
     });
 
 const buildCandidateRecommendation = ({
@@ -290,6 +373,8 @@ const buildCandidateRecommendation = ({
     giftContext,
     occasionContext,
     wishlistSignals,
+    boostMap,
+    boostContext,
 }) => {
     const scoreResult = scoreWishlistAwareProduct({
         product,
@@ -298,23 +383,60 @@ const buildCandidateRecommendation = ({
         source,
         wishlistSignals,
     });
+    const organicScore = Number(
+        scoreResult.scoreBreakdown?.totalBeforeClamp ?? scoreResult.giftScore ?? 0
+    );
+    const paidBoost = calculatePaidBoostForProduct({
+        product,
+        boostMap,
+        options: {
+            context: boostContext,
+            mode: 'gift',
+            organicScore,
+            relevantCategories:
+                boostContext?.priorityRelevantCategories || boostContext?.relevantCategories,
+        },
+    });
+    const paidBoostScore = Number(paidBoost.paidBoostScore) || 0;
+    const finalScore = organicScore + paidBoostScore;
+    const giftScore = clamp(Math.round(finalScore), 0, 100);
+    const reasons = Array.isArray(scoreResult.reasons) ? [...scoreResult.reasons] : [];
+
+    if (paidBoost.reason && !reasons.includes(paidBoost.reason)) {
+        reasons.push(paidBoost.reason);
+    }
 
     return {
-        product: serializeGiftProduct(product),
-        giftScore: scoreResult.giftScore,
+        product: {
+            ...serializeGiftProduct(product),
+            isPromoted: Boolean(paidBoost.isPromoted),
+            paidBoostScore,
+            promotionLabel: paidBoost.promotionLabel || '',
+        },
+        organicScore,
+        paidBoostScore,
+        finalScore,
+        giftScore,
         recommendationSource: source,
-        reasons: scoreResult.reasons,
-        scoreBreakdown: scoreResult.scoreBreakdown,
+        reasons,
+        scoreBreakdown: {
+            ...scoreResult.scoreBreakdown,
+            paidBoostScore,
+        },
+        isPromoted: Boolean(paidBoost.isPromoted),
+        promotionLabel: paidBoost.promotionLabel || '',
     };
 };
 
 const buildSelectableRecommendations = (recommendations) => {
     const positiveRecommendations = recommendations.filter(
-        (recommendation) => Number(recommendation.giftScore) > 0
+        (recommendation) => Number(recommendation.finalScore ?? recommendation.giftScore) > 0
     );
 
     return sortRecommendations(
-        positiveRecommendations.length >= 5 ? positiveRecommendations : recommendations
+        positiveRecommendations.length >= GIFT_RECOMMENDATION_LIMIT
+            ? positiveRecommendations
+            : recommendations
     );
 };
 
@@ -361,7 +483,7 @@ const countSelectionsBySource = (recommendations) =>
                 counts.selectedWishlistProductCount += 1;
             } else if (source === 'similar_to_wishlist') {
                 counts.selectedSimilarProductCount += 1;
-            } else if (source === 'general_catalog') {
+            } else if (source === 'general_catalog' || source === 'promoted_relevant_category') {
                 counts.selectedGeneralProductCount += 1;
             }
 
@@ -613,16 +735,12 @@ const getFriendWishlistGiftRecommendations = async ({
 
     const giftContext = parseGiftContext(trimmedMessage);
     const occasionContext = getBangladeshOccasionContext(giftContext);
-
-    const wishlistCandidates = activeInStockWishlistProducts.map((product) =>
-        buildCandidateRecommendation({
-            product,
-            source: 'friend_wishlist',
-            giftContext,
-            occasionContext,
-            wishlistSignals,
-        })
-    );
+    const baseBoostContext = buildGiftBoostContext(giftContext, occasionContext, {
+        friendWishlistCategories: wishlistSignals.categories,
+        similarWishlistCategories: wishlistSignals.categories,
+        friendWishlistProducts: validWishlistProducts,
+        wishlistProducts: validWishlistProducts,
+    });
 
     const wishlistProductIds = validWishlistProducts.map((product) => product._id).filter(Boolean);
     const similarQuery = buildSimilarProductsQuery(wishlistSignals, wishlistProductIds);
@@ -630,53 +748,154 @@ const getFriendWishlistGiftRecommendations = async ({
     const similarProducts = similarQuery
         ? await Product.find(similarQuery).limit(80).lean()
         : [];
-
-    const similarCandidates = similarProducts.map((product) =>
-        buildCandidateRecommendation({
-            product,
-            source: 'similar_to_wishlist',
-            giftContext,
-            occasionContext,
-            wishlistSignals,
-        })
-    );
-
-    let combinedCandidates = buildSelectableRecommendations([
-        ...wishlistCandidates,
-        ...similarCandidates,
-    ]);
-    let recommendations = applyRecommendationDiversity(combinedCandidates, 5);
-
-    if (recommendations.length < 5) {
-        const excludedProductIds = Array.from(
-            new Set(
-                [...wishlistCandidates, ...similarCandidates]
-                    .map((recommendation) => getRecommendationId(recommendation))
-                    .filter(Boolean)
+    const promotedCatalogProducts = dedupeProductsById(
+        (
+            await getActiveBoostedProductsForRelevantCategories({
+                categories:
+                    baseBoostContext.priorityRelevantCategories ||
+                    baseBoostContext.relevantCategories,
+                placement: 'gift',
+                limit: 20,
+            })
+        )
+            .map((entry) => entry.product)
+            .filter(
+                (product) =>
+                    isCatalogEligibleProduct(product) &&
+                    !wishlistProductIds.some((wishlistProductId) => String(wishlistProductId) === getProductId(product)) &&
+                    !similarProducts.some((similarProduct) => getProductId(similarProduct) === getProductId(product))
             )
+    );
+    let generalProducts = [];
+
+    const buildBoostContext = (extraContext = {}) =>
+        buildGiftBoostContext(giftContext, occasionContext, {
+            friendWishlistCategories: wishlistSignals.categories,
+            similarWishlistCategories: wishlistSignals.categories,
+            friendWishlistProducts: validWishlistProducts,
+            similarWishlistProducts: similarProducts,
+            wishlistProducts: validWishlistProducts,
+            promotedProducts: promotedCatalogProducts,
+            ...extraContext,
+        });
+
+    const buildCandidates = async () => {
+        const boostMap = await getActiveBoostMapForProducts(
+            [
+                ...activeInStockWishlistProducts.map((product) => product._id),
+                ...similarProducts.map((product) => product._id),
+                ...promotedCatalogProducts.map((product) => product._id),
+                ...generalProducts.map((product) => product._id),
+            ],
+            'gift'
         );
-
-        const generalProducts = await Product.find({
-            ...ACTIVE_GIFT_PRODUCT_FILTER,
-            _id: { $nin: excludedProductIds },
-        }).lean();
-
-        const generalCandidates = generalProducts.map((product) =>
+        const boostContext = buildBoostContext();
+        const nextWishlistCandidates = activeInStockWishlistProducts.map((product) =>
+            buildCandidateRecommendation({
+                product,
+                source: 'friend_wishlist',
+                giftContext,
+                occasionContext,
+                wishlistSignals,
+                boostMap,
+                boostContext,
+            })
+        );
+        const nextSimilarCandidates = similarProducts.map((product) =>
+            buildCandidateRecommendation({
+                product,
+                source: 'similar_to_wishlist',
+                giftContext,
+                occasionContext,
+                wishlistSignals,
+                boostMap,
+                boostContext,
+            })
+        );
+        const nextPromotedCandidates = promotedCatalogProducts.map((product) =>
+            buildCandidateRecommendation({
+                product,
+                source: 'promoted_relevant_category',
+                giftContext,
+                occasionContext,
+                wishlistSignals,
+                boostMap,
+                boostContext,
+            })
+        );
+        const nextGeneralCandidates = generalProducts.map((product) =>
             buildCandidateRecommendation({
                 product,
                 source: 'general_catalog',
                 giftContext,
                 occasionContext,
                 wishlistSignals,
+                boostMap,
+                boostContext,
             })
         );
+
+        return {
+            wishlistCandidates: nextWishlistCandidates,
+            similarCandidates: nextSimilarCandidates,
+            promotedCandidates: nextPromotedCandidates,
+            generalCandidates: nextGeneralCandidates,
+        };
+    };
+
+    let {
+        wishlistCandidates,
+        similarCandidates,
+        promotedCandidates,
+        generalCandidates,
+    } = await buildCandidates();
+    let combinedCandidates = buildSelectableRecommendations([
+        ...wishlistCandidates,
+        ...similarCandidates,
+        ...promotedCandidates,
+    ]);
+    let recommendations = applyFriendWishlistPriorityQuota(
+        applyRecommendationDiversity(
+            combinedCandidates,
+            GIFT_RECOMMENDATION_LIMIT
+        ),
+        combinedCandidates,
+    );
+
+    if (recommendations.length < GIFT_RECOMMENDATION_LIMIT) {
+        const excludedProductIds = Array.from(
+            new Set(
+                [...wishlistCandidates, ...similarCandidates, ...promotedCandidates]
+                    .map((recommendation) => getRecommendationId(recommendation))
+                    .filter(Boolean)
+            )
+        );
+
+        generalProducts = await Product.find({
+            ...ACTIVE_GIFT_PRODUCT_FILTER,
+            _id: { $nin: excludedProductIds },
+        }).lean();
+
+        ({
+            wishlistCandidates,
+            similarCandidates,
+            promotedCandidates,
+            generalCandidates,
+        } = await buildCandidates());
 
         combinedCandidates = buildSelectableRecommendations([
             ...wishlistCandidates,
             ...similarCandidates,
+            ...promotedCandidates,
             ...generalCandidates,
         ]);
-        recommendations = applyRecommendationDiversity(combinedCandidates, 5);
+        recommendations = applyFriendWishlistPriorityQuota(
+            applyRecommendationDiversity(
+                combinedCandidates,
+                GIFT_RECOMMENDATION_LIMIT
+            ),
+            combinedCandidates,
+        );
     }
 
     const selectionCounts = countSelectionsBySource(recommendations);

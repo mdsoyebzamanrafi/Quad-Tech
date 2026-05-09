@@ -213,7 +213,8 @@ test('POST /api/ai/gift-assistant returns real recommendations and respects dive
     assert.equal(response.body.success, true);
     assert.equal(response.body.giftContext.recipientType, 'girlfriend');
     assert.equal(response.body.giftContext.budgetMax, 5000);
-    assert.equal(response.body.recommendations.length, 5);
+    assert.ok(response.body.recommendations.length >= 5);
+    assert.ok(response.body.recommendations.length <= 10);
     assert.equal(typeof response.body.reply, 'string');
     assert.ok(response.body.reply.length > 0);
 

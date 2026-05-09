@@ -1,7 +1,8 @@
+import { useCurrency } from '../../context/CurrencyContext';
 import React, { useCallback, useEffect, useState } from 'react';
 import { BarChart3, RotateCcw } from 'lucide-react';
 import api from '../../utils/api';
-import { formatMoney, getErrorMessage } from '../../utils/adminUtils';
+import { getErrorMessage } from '../../utils/adminUtils';
 
 const metricCards = [
     { key: 'totalRevenue', label: 'Total Revenue' },
@@ -15,6 +16,7 @@ const metricCards = [
 ];
 
 const SalesDashboardPage = () => {
+    const { formatCurrency } = useCurrency();
     const [summary, setSummary] = useState({});
     const [dailySales, setDailySales] = useState([]);
     const [productSales, setProductSales] = useState([]);
@@ -105,7 +107,7 @@ const SalesDashboardPage = () => {
                                 <div className="admin-card" key={metric.key} style={{ padding: '1rem' }}>
                                     <div className="admin-muted" style={{ marginBottom: '0.35rem' }}>{metric.label}</div>
                                     <div className="admin-strong" style={{ fontSize: '1.4rem' }}>
-                                        {metric.numeric ? (summary[metric.key] ?? 0) : formatMoney(summary[metric.key] ?? 0)}
+                                        {metric.numeric ? (summary[metric.key] ?? 0) : formatCurrency(summary[metric.key] ?? 0)}
                                     </div>
                                 </div>
                             ))}
@@ -135,10 +137,10 @@ const SalesDashboardPage = () => {
                                         ) : dailySales.map((item) => (
                                             <tr key={item.date}>
                                                 <td>{item.date}</td>
-                                                <td>{formatMoney(item.revenue)}</td>
+                                                <td>{formatCurrency(item.revenue)}</td>
                                                 <td>{item.orders}</td>
-                                                <td>{formatMoney(item.grossSales)}</td>
-                                                <td>{formatMoney(item.discount)}</td>
+                                                <td>{formatCurrency(item.grossSales)}</td>
+                                                <td>{formatCurrency(item.discount)}</td>
                                             </tr>
                                         ))}
                                     </tbody>
@@ -165,7 +167,7 @@ const SalesDashboardPage = () => {
                                                 <tr key={item.productId}>
                                                     <td>{item.name}</td>
                                                     <td>{item.quantitySold}</td>
-                                                    <td>{formatMoney(item.revenue)}</td>
+                                                    <td>{formatCurrency(item.revenue)}</td>
                                                 </tr>
                                             ))}
                                         </tbody>
@@ -192,8 +194,8 @@ const SalesDashboardPage = () => {
                                                 <tr key={item.code}>
                                                     <td>{item.code}</td>
                                                     <td>{item.uses}</td>
-                                                    <td>{formatMoney(item.totalDiscount)}</td>
-                                                    <td>{formatMoney(item.revenueAfterDiscount)}</td>
+                                                    <td>{formatCurrency(item.totalDiscount)}</td>
+                                                    <td>{formatCurrency(item.revenueAfterDiscount)}</td>
                                                 </tr>
                                             ))}
                                         </tbody>

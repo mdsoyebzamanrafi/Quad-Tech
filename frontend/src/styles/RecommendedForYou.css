@@ -88,6 +88,12 @@
     box-shadow: var(--shadow-sm);
     min-width: 0;
     container-type: inline-size;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.recommended-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
 }
 
 .badge-electronics {
@@ -132,6 +138,21 @@
 
 .recommended-department-badge {
     left: 0.9rem;
+}
+
+.recommended-promoted-badge {
+    position: absolute;
+    top: 3.2rem;
+    left: 0.9rem;
+    display: inline-flex;
+    align-items: center;
+    padding: 0.32rem 0.62rem;
+    border-radius: 9999px;
+    background: rgba(15, 23, 42, 0.74);
+    color: white;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
 }
 
 .recommended-match-badge {
@@ -198,6 +219,12 @@
 .recommended-meta {
     color: var(--text-muted);
     font-size: 0.92rem;
+}
+
+.recommended-score-note {
+    color: var(--color-accent-1);
+    font-size: 0.86rem;
+    font-weight: 600;
 }
 
 .recommended-reasons {

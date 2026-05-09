@@ -1,3 +1,4 @@
+import { useCurrency } from '../../context/CurrencyContext';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Eye, Filter, RotateCcw } from 'lucide-react';
@@ -7,7 +8,6 @@ import {
     ORDER_STATUSES,
     PAYMENT_STATUSES,
     formatDate,
-    formatMoney,
     getErrorMessage,
     isSuperAdmin,
     labelize,
@@ -18,6 +18,7 @@ import {
 const AdminOrdersPage = () => {
     const { userInfo } = useAuth();
     const canBulkDeliver = isSuperAdmin(userInfo);
+    const { formatCurrency } = useCurrency();
     const [searchParams, setSearchParams] = useSearchParams();
     const [orders, setOrders] = useState([]);
     const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0, limit: 20 });
@@ -251,7 +252,7 @@ const AdminOrdersPage = () => {
                                                 <div className="admin-strong">{order.user?.name || order.shippingName || 'Guest'}</div>
                                                 <div className="admin-muted">{order.user?.email || order.shippingPhone || 'No contact'}</div>
                                             </td>
-                                            <td>{formatMoney(order.total ?? order.totalPrice)}</td>
+                                            <td>{formatCurrency(order.total ?? order.totalPrice)}</td>
                                             <td>
                                                 <span className={`admin-pill ${statusTone(order.orderStatus)}`}>
                                                     {labelize(order.orderStatus)}

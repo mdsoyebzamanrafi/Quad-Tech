@@ -15,6 +15,7 @@ import friendRoutes from './routes/friendRoutes.js';
 import recommendationRoutes from './routes/recommendationRoutes.js';
 import giftAssistantRoutes from './routes/giftAssistantRoutes.js';
 import cloudClosetRoutes from './routes/cloudClosetRoutes.js';
+import priorityBoostRoutes from './routes/priorityBoostRoutes.js';
 import { errorHandler, notFound } from './middleware/errorMiddleware.js';
 
 const app = express();
@@ -63,6 +64,7 @@ app.use('/api/friends', friendRoutes);
 app.use('/api/recommendations', recommendationRoutes);
 app.use('/api/ai', giftAssistantRoutes);
 app.use('/api/cloud-closet', cloudClosetRoutes);
+app.use('/api/priority-boosts', priorityBoostRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

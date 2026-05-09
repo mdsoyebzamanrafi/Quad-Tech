@@ -11,6 +11,7 @@ import {
     normalizeDepartment,
     normalizeStringList,
 } from '../utils/productUtils';
+import { useCurrency } from '../context/CurrencyContext';
 
 const ProductDetails = () => {
     const { id } = useParams();
@@ -22,6 +23,8 @@ const ProductDetails = () => {
     const [activeImage, setActiveImage] = useState('');
     const [selectedColor, setSelectedColor] = useState('');
     const [selectedSize, setSelectedSize] = useState('');
+
+    const { formatCurrency } = useCurrency();
 
     const { addToCart } = useCart();
 
@@ -87,7 +90,7 @@ const ProductDetails = () => {
         try {
             await api.post('/api/wishlist', { productId: product._id });
             alert('Added to wishlist!');
-        } catch (wishlistError) {
+        } catch {
             alert('Please login to add to wishlist');
         }
     };
@@ -216,7 +219,7 @@ const ProductDetails = () => {
                         </span>
                     </div>
 
-                    <div className="price-tag text-gradient">${Number(normalizedProduct.price || 0).toFixed(2)}</div>
+                    <div className="price-tag text-gradient">{formatCurrency(normalizedProduct.price)}</div>
 
                     <p className="product-description">{normalizedProduct.description}</p>
 
@@ -254,7 +257,7 @@ const ProductDetails = () => {
                 <div className="product-action-box glass">
                     <div className="action-row">
                         <span className="action-label">Price</span>
-                        <strong className="action-value">${Number(normalizedProduct.price || 0).toFixed(2)}</strong>
+                        <strong className="action-value">{formatCurrency(normalizedProduct.price)}</strong>
                     </div>
 
                     <div className="action-row">

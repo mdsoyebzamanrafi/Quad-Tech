@@ -1,8 +1,9 @@
+import { useCurrency } from '../../context/CurrencyContext';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Pencil, Plus, Power, RotateCcw } from 'lucide-react';
 import api from '../../utils/api';
-import { formatMoney, getErrorMessage } from '../../utils/adminUtils';
+import { getErrorMessage } from '../../utils/adminUtils';
 
 const getStockStatus = (countInStock) => {
     const stock = Number(countInStock ?? 0);
@@ -21,6 +22,7 @@ const getStockStatus = (countInStock) => {
 const isProductActive = (product) => product?.isActive !== false;
 
 const AdminProductsPage = () => {
+    const { formatCurrency } = useCurrency();
     const [searchParams, setSearchParams] = useSearchParams();
     const [products, setProducts] = useState([]);
     const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0, limit: 10 });
@@ -260,7 +262,7 @@ const AdminProductsPage = () => {
                                                 </td>
                                                 <td>{product.category || 'Not set'}</td>
                                                 <td>{product.brand || 'Not set'}</td>
-                                                <td>{formatMoney(product.price)}</td>
+                                                <td>{formatCurrency(product.price)}</td>
                                                 <td>{product.countInStock ?? 0}</td>
                                                 <td>
                                                     <span className={`admin-pill ${stockStatus.tone}`}>

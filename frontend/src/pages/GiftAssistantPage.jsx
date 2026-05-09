@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
     AlertCircle,
     BadgeCheck,
@@ -17,16 +17,10 @@ import {
 import api from '../utils/api';
 import { useAuth } from '../context/AuthContext';
 import { getDepartmentLabel, normalizeDepartment } from '../utils/productUtils';
+import { useCurrency } from '../context/CurrencyContext';
 import '../styles/GiftAssistantPage.css';
 
-const TAKA_SYMBOL = '\u09F3';
-
-const formatCurrency = (value) => {
-    const number = Number(value || 0);
-    return `${TAKA_SYMBOL}${number.toLocaleString('en-BD')}`;
-};
-
-const formatBudget = (giftContext) => {
+const formatBudget = (giftContext, formatCurrencyFn) => {
     if (!giftContext) {
         return 'Not specified';
     }
@@ -34,15 +28,15 @@ const formatBudget = (giftContext) => {
     const { budgetMin, budgetMax } = giftContext;
 
     if (budgetMin && budgetMax) {
-        return `${formatCurrency(budgetMin)} - ${formatCurrency(budgetMax)}`;
+        return `${formatCurrencyFn(budgetMin)} - ${formatCurrencyFn(budgetMax)}`;
     }
 
     if (budgetMax) {
-        return `Under ${formatCurrency(budgetMax)}`;
+        return `Under ${formatCurrencyFn(budgetMax)}`;
     }
 
     if (budgetMin) {
-        return `From ${formatCurrency(budgetMin)}`;
+        return `From ${formatCurrencyFn(budgetMin)}`;
     }
 
     return 'Not specified';
@@ -121,6 +115,10 @@ const getSourceBadge = (source) => {
         return 'Similar to wishlist';
     }
 
+    if (source === 'promoted_relevant_category') {
+        return 'Promoted category match';
+    }
+
     if (source === 'general_catalog') {
         return 'Catalog pick';
     }
@@ -135,6 +133,10 @@ const getSourceToneClass = (source) => {
 
     if (source === 'similar_to_wishlist') {
         return 'gift-source-similar';
+    }
+
+    if (source === 'promoted_relevant_category') {
+        return 'gift-source-general';
     }
 
     if (source === 'general_catalog') {
@@ -211,6 +213,7 @@ const breakdownEntries = [
     { key: 'budgetScore', label: 'Budget' },
     { key: 'qualityScore', label: 'Quality' },
     { key: 'priorityScore', label: 'Priority' },
+    { key: 'paidBoostScore', label: 'Paid boost' },
     { key: 'departmentScore', label: 'Department' },
     { key: 'penaltyScore', label: 'Penalty' },
     { key: 'totalBeforeClamp', label: 'Total before clamp' },
@@ -218,7 +221,9 @@ const breakdownEntries = [
 
 const GiftAssistantPage = () => {
     const location = useLocation();
+    const navigate = useNavigate();
     const { userInfo } = useAuth();
+    const { formatCurrency } = useCurrency();
     const [message, setMessage] = useState('');
     const [useFriendWishlist, setUseFriendWishlist] = useState(false);
     const [friendIdentifier, setFriendIdentifier] = useState('');
@@ -502,7 +507,7 @@ const GiftAssistantPage = () => {
                                 </div>
                                 <div>
                                     <span>Budget</span>
-                                    <strong>{formatBudget(result.giftContext)}</strong>
+                                    <strong>{formatBudget(result.giftContext, formatCurrency)}</strong>
                                 </div>
                                 <div>
                                     <span>Department preference</span>
@@ -656,13 +661,38 @@ const GiftAssistantPage = () => {
                                         expandedBreakdowns[breakdownKey]
                                     );
                                     const department = normalizeDepartment(product.department);
+                                    const isPromoted =
+                                        Boolean(recommendation.isPromoted) ||
+                                        Boolean(product.isPromoted) ||
+                                        Number(recommendation.paidBoostScore) > 0 ||
+                                        Number(product.paidBoostScore) > 0;
                                     const visibleBreakdownEntries = breakdownEntries.filter(
-                                        (entry) =>
-                                            recommendation.scoreBreakdown?.[entry.key] !== undefined
+                                        (entry) => {
+                                            const value = recommendation.scoreBreakdown?.[entry.key];
+
+                                            if (value === undefined) {
+                                                return false;
+                                            }
+
+                                            if (entry.key === 'paidBoostScore') {
+                                                return Number(value) > 0;
+                                            }
+
+                                            return true;
+                                        }
                                     );
 
                                     return (
-                                        <article key={breakdownKey} className="gift-product-card glass">
+                                        <article 
+                                            key={breakdownKey} 
+                                            className="gift-product-card glass"
+                                            onClick={(e) => {
+                                                if (!e.target.closest('button') && productLink) {
+                                                    navigate(productLink);
+                                                }
+                                            }}
+                                            style={{ cursor: 'pointer' }}
+                                        >
                                             <div className="gift-product-image">
                                                 {image ? (
                                                     <img src={image} alt={product.name || 'Gift product'} />
@@ -677,6 +707,11 @@ const GiftAssistantPage = () => {
                                                 >
                                                     {getSourceBadge(source)}
                                                 </span>
+                                                {isPromoted ? (
+                                                    <span className="gift-promoted-badge">
+                                                        Promoted
+                                                    </span>
+                                                ) : null}
 
                                                 <div className={`gift-score-badge ${scoreTone}`}>
                                                     <strong>{score}/100</strong>
@@ -725,18 +760,6 @@ const GiftAssistantPage = () => {
                                                 </ul>
 
                                                 <div className="gift-card-actions">
-                                                    <Link
-                                                        to={productLink || '/'}
-                                                        className="btn btn-primary"
-                                                        aria-disabled={!productLink}
-                                                        onClick={(event) => {
-                                                            if (!productLink) {
-                                                                event.preventDefault();
-                                                            }
-                                                        }}
-                                                    >
-                                                        View Product
-                                                    </Link>
 
                                                     {showBreakdown ? (
                                                         <button

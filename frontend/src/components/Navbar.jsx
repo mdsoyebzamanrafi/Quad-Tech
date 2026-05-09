@@ -21,6 +21,7 @@ import api from '../utils/api';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
+import { useCurrency } from '../context/CurrencyContext';
 import { isAdminUser } from '../utils/adminUtils';
 import {
     ELECTRONICS_NAV_CATEGORIES,
@@ -32,6 +33,7 @@ const Navbar = () => {
     const { isDarkMode, toggleTheme } = useTheme();
     const { userInfo, logout } = useAuth();
     const { cartItems } = useCart();
+    const { currency, changeCurrency, supportedCurrencies } = useCurrency();
     const navigate = useNavigate();
     const [dropdownOpen, setDropdownOpen] = useState(false);
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -39,6 +41,7 @@ const Navbar = () => {
     const [suggestions, setSuggestions] = useState([]);
     const [showSuggestions, setShowSuggestions] = useState(false);
     const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
+    const [currencyDropdownOpen, setCurrencyDropdownOpen] = useState(false);
     const dropdownRef = React.useRef(null);
     const searchRef = React.useRef(null);
     const canAccessAdmin = isAdminUser(userInfo);
@@ -204,6 +207,65 @@ const Navbar = () => {
                         {isMobileSearchOpen ? <X size={20} /> : <Search size={20} />}
                     </button>
 
+                    <div className="currency-selector-custom" style={{ position: 'relative' }} onMouseLeave={() => setCurrencyDropdownOpen(false)}>
+                        <button 
+                            onClick={() => setCurrencyDropdownOpen(!currencyDropdownOpen)}
+                            style={{
+                                background: 'transparent',
+                                color: 'var(--text-main)',
+                                border: '1px solid var(--border-color)',
+                                borderRadius: '8px',
+                                padding: '0.3rem 0.6rem',
+                                outline: 'none',
+                                fontFamily: 'inherit',
+                                fontSize: '0.9rem',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '0.2rem'
+                            }}
+                        >
+                            {currency} <span style={{ fontSize: '0.7rem' }}>▼</span>
+                        </button>
+                        {currencyDropdownOpen && (
+                            <ul className="glass" style={{
+                                position: 'absolute',
+                                top: '100%',
+                                right: 0,
+                                listStyle: 'none',
+                                padding: '0.5rem',
+                                margin: '0.3rem 0 0',
+                                borderRadius: '8px',
+                                border: '1px solid var(--border-color)',
+                                zIndex: 100,
+                                minWidth: '70px',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '0.2rem'
+                            }}>
+                                {supportedCurrencies.map(c => (
+                                    <li 
+                                        key={c.code} 
+                                        onClick={() => { changeCurrency(c.code); setCurrencyDropdownOpen(false); }}
+                                        style={{
+                                            padding: '0.3rem 0.5rem',
+                                            cursor: 'pointer',
+                                            borderRadius: '4px',
+                                            color: currency === c.code ? 'var(--color-accent-1)' : 'var(--text-main)',
+                                            background: currency === c.code ? 'var(--bg-secondary)' : 'transparent',
+                                            textAlign: 'center',
+                                            fontSize: '0.9rem'
+                                        }}
+                                        onMouseEnter={(e) => { if (currency !== c.code) e.target.style.background = 'var(--bg-secondary)'; }}
+                                        onMouseLeave={(e) => { if (currency !== c.code) e.target.style.background = 'transparent'; }}
+                                    >
+                                        {c.code}
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </div>
+
                     <button onClick={toggleTheme} className="theme-toggle" aria-label="Toggle Theme">
                         {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
                     </button>
@@ -228,7 +290,7 @@ const Navbar = () => {
                                         <Package size={16} /> Orders
                                     </Link>
                                     {canAccessAdmin && (
-                                        <Link to="/admin" className="dropdown-item">
+                                        <Link to="/admin" className="dropdown-item" onClick={() => localStorage.removeItem('adminViewMode')}>
                                             <ShieldCheck size={16} /> Admin
                                         </Link>
                                     )}

@@ -1,3 +1,4 @@
+import { applyPriorityQuotaToRecommendations } from './priorityBoostService.js';
 import { normalizeDepartment, normalizeStringList, toObjectIdString } from './recommendationContextService.js';
 
 const PURCHASED_SCORE_PENALTY = -100;
@@ -33,6 +34,121 @@ const registerProductCounts = (counts, product) => {
             `${product.category || 'uncategorized'}::${getColorSignature(product)}`
         );
     }
+};
+
+const getRecommendationOrganicScore = (recommendation) =>
+    Number(recommendation.organicScore ?? recommendation.finalScore ?? 0);
+
+const getRecommendationPaidBoostScore = (recommendation) =>
+    Number(recommendation.paidBoostScore ?? recommendation?.product?.paidBoostScore ?? 0);
+
+const getRecommendationRating = (recommendation) =>
+    Number(recommendation?.product?.rating ?? recommendation?.product?.averageRating ?? 0);
+
+const getRecommendationTimestamp = (recommendation) =>
+    new Date(recommendation?.product?.createdAt || recommendation?.product?.updatedAt || 0).getTime() || 0;
+
+const getRecommendationSource = (recommendation) =>
+    String(recommendation?.recommendationSource || recommendation?.source || '')
+        .trim()
+        .toLowerCase();
+
+const compareRecommendations = (firstRecommendation, secondRecommendation) => {
+    const finalScoreDifference =
+        Number(secondRecommendation.finalScore || 0) - Number(firstRecommendation.finalScore || 0);
+
+    if (finalScoreDifference !== 0) {
+        return finalScoreDifference;
+    }
+
+    const organicScoreDifference =
+        getRecommendationOrganicScore(secondRecommendation) -
+        getRecommendationOrganicScore(firstRecommendation);
+
+    if (organicScoreDifference !== 0) {
+        return organicScoreDifference;
+    }
+
+    const paidBoostScoreDifference =
+        getRecommendationPaidBoostScore(secondRecommendation) -
+        getRecommendationPaidBoostScore(firstRecommendation);
+
+    if (paidBoostScoreDifference !== 0) {
+        return paidBoostScoreDifference;
+    }
+
+    const ratingDifference =
+        getRecommendationRating(secondRecommendation) - getRecommendationRating(firstRecommendation);
+
+    if (ratingDifference !== 0) {
+        return ratingDifference;
+    }
+
+    return getRecommendationTimestamp(secondRecommendation) - getRecommendationTimestamp(firstRecommendation);
+};
+
+const isPromotedRecommendation = (recommendation = {}) =>
+    Boolean(recommendation?.isPromoted) ||
+    Boolean(recommendation?.product?.isPromoted) ||
+    getRecommendationPaidBoostScore(recommendation) > 0;
+
+const getRecommendationReasons = (recommendation) =>
+    Array.isArray(recommendation?.reasons)
+        ? recommendation.reasons
+            .filter((reason) => typeof reason === 'string')
+            .map((reason) => reason.trim().toLowerCase())
+        : [];
+
+const isProtectedOrganicRecommendation = (recommendation = {}) => {
+    const recommendationSource = getRecommendationSource(recommendation);
+    const scoreBreakdown = recommendation?.scoreBreakdown || {};
+    const reasons = getRecommendationReasons(recommendation);
+    const wishlistScore = Number(scoreBreakdown.wishlistScore || 0);
+    const cartScore = Number(scoreBreakdown.cartScore || 0);
+    const purchaseHistoryScore = Number(scoreBreakdown.purchaseHistoryScore || 0);
+    const cloudClosetScore = Number(scoreBreakdown.cloudClosetScore || 0);
+    const hasExactWishlistReason = reasons.some((reason) =>
+        reason.includes('already in your wishlist')
+    );
+    const hasExactCartReason = reasons.some((reason) =>
+        reason.includes('already in your cart')
+    );
+    const hasExactPurchaseReason = reasons.some((reason) =>
+        reason.includes('already purchased exact product')
+    );
+
+    if (
+        [
+            'exact_wishlist',
+            'wishlist',
+            'cart_related',
+            'past_order_related',
+            'purchase_history',
+            'cloud_closet',
+            'saved_preference',
+            'friend_wishlist',
+        ].includes(recommendationSource)
+    ) {
+        return true;
+    }
+
+    if (hasExactWishlistReason || hasExactCartReason || hasExactPurchaseReason) {
+        return true;
+    }
+
+    if (wishlistScore >= 55) {
+        return true;
+    }
+
+    if (cartScore >= 35) {
+        return true;
+    }
+
+    if (purchaseHistoryScore >= 40) {
+        return true;
+    }
+
+    return cloudClosetScore >= 70;
 };
 
 const canAddProduct = (counts, recommendation, options = {}) => {
@@ -123,6 +239,21 @@ const fillRemainingRecommendations = (baseSelection, sortedRecommendations, limi
     return baseSelection.selected;
 };
 
+const applyPriorityQuota = (selectedRecommendations, sortedRecommendations, options = {}) => {
+    const limit = Number(options.limit) > 0 ? Number(options.limit) : 5;
+
+    return applyPriorityQuotaToRecommendations({
+        recommendations: selectedRecommendations,
+        rankedRecommendations: sortedRecommendations,
+        finalLimit: limit,
+        mode: 'personal',
+        promotedProductIds: options.promotedRelevantProductIds,
+        sortComparator: compareRecommendations,
+        isProtectedRecommendation: isProtectedOrganicRecommendation,
+        isPromotedRecommendation,
+    }).slice(0, limit);
+};
+
 const filterAndLimitRecommendations = (scoredProducts, options = {}) => {
     const limit = Number(options.limit) > 0 ? Number(options.limit) : 5;
 
@@ -134,7 +265,7 @@ const filterAndLimitRecommendations = (scoredProducts, options = {}) => {
             (recommendation) =>
                 Number(recommendation.scoreBreakdown?.purchaseHistoryScore) > PURCHASED_SCORE_PENALTY
         )
-        .sort((firstRecommendation, secondRecommendation) => secondRecommendation.finalScore - firstRecommendation.finalScore);
+        .sort(compareRecommendations);
 
     const strictSelection = selectRecommendations(cleanedRecommendations, {
         preferenceProfile: options.preferenceProfile,
@@ -142,7 +273,11 @@ const filterAndLimitRecommendations = (scoredProducts, options = {}) => {
     });
 
     if (strictSelection.selected.length >= limit) {
-        return strictSelection.selected.slice(0, limit);
+        return applyPriorityQuota(
+            strictSelection.selected.slice(0, limit),
+            cleanedRecommendations,
+            options
+        ).slice(0, limit);
     }
 
     const relaxedDepartmentSelection = selectRecommendations(cleanedRecommendations, {
@@ -151,7 +286,11 @@ const filterAndLimitRecommendations = (scoredProducts, options = {}) => {
     });
 
     if (relaxedDepartmentSelection.selected.length >= limit) {
-        return relaxedDepartmentSelection.selected.slice(0, limit);
+        return applyPriorityQuota(
+            relaxedDepartmentSelection.selected.slice(0, limit),
+            cleanedRecommendations,
+            options
+        ).slice(0, limit);
     }
 
     const filledRecommendations = fillRemainingRecommendations(
@@ -160,7 +299,16 @@ const filterAndLimitRecommendations = (scoredProducts, options = {}) => {
         limit
     );
 
-    return filledRecommendations.slice(0, limit);
+    return applyPriorityQuota(
+        filledRecommendations.slice(0, limit),
+        cleanedRecommendations,
+        options
+    ).slice(0, limit);
 };
 
-export { filterAndLimitRecommendations };
+export {
+    compareRecommendations,
+    filterAndLimitRecommendations,
+    isPromotedRecommendation,
+    isProtectedOrganicRecommendation,
+};

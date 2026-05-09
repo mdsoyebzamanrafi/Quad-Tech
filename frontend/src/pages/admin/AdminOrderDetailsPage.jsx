@@ -1,3 +1,4 @@
+import { useCurrency } from '../../context/CurrencyContext';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { ArrowLeft, Save } from 'lucide-react';
@@ -7,7 +8,6 @@ import {
     ORDER_STATUSES,
     PAYMENT_STATUSES,
     formatDateTime,
-    formatMoney,
     getErrorMessage,
     labelize,
     shortId,
@@ -15,6 +15,7 @@ import {
 } from '../../utils/adminUtils';
 
 const AdminOrderDetailsPage = () => {
+    const { formatCurrency } = useCurrency();
     const { id } = useParams();
     const [order, setOrder] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -233,8 +234,8 @@ const AdminOrderDetailsPage = () => {
                                         </div>
                                     </td>
                                     <td>{item.qty || item.quantity}</td>
-                                    <td>{formatMoney(item.price ?? item.unitPrice)}</td>
-                                    <td>{formatMoney(item.lineTotal ?? ((item.price ?? item.unitPrice) * (item.qty || item.quantity || 0)))}</td>
+                                    <td>{formatCurrency(item.price ?? item.unitPrice)}</td>
+                                    <td>{formatCurrency(item.lineTotal ?? ((item.price ?? item.unitPrice) * (item.qty || item.quantity || 0)))}</td>
                                 </tr>
                             ))}
                         </tbody>
@@ -246,19 +247,19 @@ const AdminOrderDetailsPage = () => {
                 <div className="admin-card">
                     <h3>Totals</h3>
                     <div className="admin-detail-list">
-                        <div className="admin-detail-row"><span>Gross Items</span><strong>{formatMoney(order.grossItemsPrice ?? order.subtotal ?? order.itemsPrice)}</strong></div>
+                        <div className="admin-detail-row"><span>Gross Items</span><strong>{formatCurrency(order.grossItemsPrice ?? order.subtotal ?? order.itemsPrice)}</strong></div>
                         <div className="admin-detail-row"><span>Coupon Code</span><strong>{order.coupon?.code || 'None'}</strong></div>
-                        <div className="admin-detail-row"><span>Coupon Discount</span><strong>{formatMoney(order.coupon?.discountAmount)}</strong></div>
+                        <div className="admin-detail-row"><span>Coupon Discount</span><strong>{formatCurrency(order.coupon?.discountAmount)}</strong></div>
                         <div className="admin-detail-row"><span>Smart Discount Rule</span><strong>{order.smartDiscount?.ruleName || 'None'}</strong></div>
-                        <div className="admin-detail-row"><span>Smart Discount</span><strong>{formatMoney(order.smartDiscount?.discountAmount)}</strong></div>
+                        <div className="admin-detail-row"><span>Smart Discount</span><strong>{formatCurrency(order.smartDiscount?.discountAmount)}</strong></div>
                         <div className="admin-detail-row"><span>Tokens Used</span><strong>{order.tokenDiscount?.tokensUsed || 0}</strong></div>
-                        <div className="admin-detail-row"><span>Token Discount</span><strong>{formatMoney(order.tokenDiscount?.discountAmount)}</strong></div>
-                        <div className="admin-detail-row"><span>Total Discount</span><strong>{formatMoney(order.totalDiscount ?? order.discount)}</strong></div>
-                        <div className="admin-detail-row"><span>Net Items</span><strong>{formatMoney(order.netItemsPrice)}</strong></div>
-                        <div className="admin-detail-row"><span>Tax</span><strong>{formatMoney(order.tax ?? order.taxPrice)}</strong></div>
-                        <div className="admin-detail-row"><span>Shipping</span><strong>{formatMoney(order.shippingFee ?? order.shippingPrice)}</strong></div>
+                        <div className="admin-detail-row"><span>Token Discount</span><strong>{formatCurrency(order.tokenDiscount?.discountAmount)}</strong></div>
+                        <div className="admin-detail-row"><span>Total Discount</span><strong>{formatCurrency(order.totalDiscount ?? order.discount)}</strong></div>
+                        <div className="admin-detail-row"><span>Net Items</span><strong>{formatCurrency(order.netItemsPrice)}</strong></div>
+                        <div className="admin-detail-row"><span>Tax</span><strong>{formatCurrency(order.tax ?? order.taxPrice)}</strong></div>
+                        <div className="admin-detail-row"><span>Shipping</span><strong>{formatCurrency(order.shippingFee ?? order.shippingPrice)}</strong></div>
                         <div className="admin-detail-row"><span>Tokens Earned</span><strong>{order.rewardTokensEarned || 0}</strong></div>
-                        <div className="admin-detail-row"><span>Total</span><strong>{formatMoney(order.total ?? order.totalPrice)}</strong></div>
+                        <div className="admin-detail-row"><span>Total</span><strong>{formatCurrency(order.total ?? order.totalPrice)}</strong></div>
                     </div>
                 </div>
 
