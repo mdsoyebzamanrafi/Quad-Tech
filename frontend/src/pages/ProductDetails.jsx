@@ -352,6 +352,38 @@ const ProductDetails = () => {
                     </div>
                 </div>
             </div>
+
+            <div className="product-reviews-section glass" style={{ marginTop: '2rem', padding: '2rem', borderRadius: 'var(--radius-lg)' }}>
+                <h2 style={{ marginBottom: '1.5rem' }}>Customer Reviews</h2>
+                {!normalizedProduct.reviews || normalizedProduct.reviews.length === 0 ? (
+                    <p style={{ color: 'var(--text-muted)' }}>No reviews yet.</p>
+                ) : (
+                    <div className="reviews-list" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                        {normalizedProduct.reviews.map((review) => (
+                            <div key={review._id} className="review-item" style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '1.5rem' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                                    <strong>{review.name}</strong>
+                                    <div style={{ display: 'flex' }}>
+                                        {[1, 2, 3, 4, 5].map((star) => (
+                                            <Star 
+                                                key={star} 
+                                                size={14} 
+                                                className={`star-icon ${review.rating >= star ? 'filled' : 'empty'}`}
+                                                fill={review.rating >= star ? 'currentColor' : 'none'}
+                                                style={{ color: review.rating >= star ? 'var(--accent-1)' : 'var(--text-muted)' }}
+                                            />
+                                        ))}
+                                    </div>
+                                </div>
+                                <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginBottom: '0.5rem' }}>
+                                    {review.createdAt ? review.createdAt.substring(0, 10) : ''}
+                                </p>
+                                <p>{review.comment}</p>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
         </div>
     );
 };

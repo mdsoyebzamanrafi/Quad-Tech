@@ -385,6 +385,85 @@ const createProductReview = async (req, res) => {
     }
 };
 
+// @desc    Update existing review
+// @route   PUT /api/products/:id/reviews
+// @access  Private
+const updateProductReview = async (req, res) => {
+    try {
+        const { rating, comment } = req.body;
+
+        const product = await Product.findById(req.params.id);
+
+        if (!product) {
+            return res.status(404).json({ message: 'Product not found' });
+        }
+
+        const existingReview = product.reviews.find(
+            (r) => r.user.toString() === req.user._id.toString()
+        );
+
+        if (!existingReview) {
+            return res.status(404).json({ message: 'Review not found. Use POST to create a new review.' });
+        }
+
+        existingReview.rating = Number(rating);
+        existingReview.comment = comment;
+
+        product.numReviews = product.reviews.length;
+        product.rating =
+            product.reviews.reduce((acc, item) => item.rating + acc, 0) /
+            product.reviews.length;
+
+        await product.save();
+        res.json({ message: 'Review updated' });
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
+// @desc    Get current user's reviews for given product IDs
+// @route   GET /api/products/user-reviews
+// @access  Private
+const getUserReviewsForProducts = async (req, res) => {
+    try {
+        const { productIds } = req.query;
+        if (!productIds) {
+            return res.json({});
+        }
+
+        const ids = productIds.split(',').filter(Boolean);
+        if (ids.length === 0) {
+            return res.json({});
+        }
+
+        const products = await Product.find(
+            { _id: { $in: ids } },
+            { reviews: 1 }
+        ).lean();
+
+        const userId = req.user._id.toString();
+        const reviewMap = {};
+
+        for (const product of products) {
+            const userReview = (product.reviews || []).find(
+                (r) => r.user.toString() === userId
+            );
+            if (userReview) {
+                reviewMap[product._id.toString()] = {
+                    rating: userReview.rating,
+                    comment: userReview.comment,
+                    createdAt: userReview.createdAt,
+                    updatedAt: userReview.updatedAt,
+                };
+            }
+        }
+
+        res.json(reviewMap);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
+
 // @desc    Create a product
 // @route   POST /api/products
 // @access  Private/Admin
@@ -630,6 +709,8 @@ export {
     getAdminProducts,
     getAdminProductById,
     createProductReview,
+    updateProductReview,
+    getUserReviewsForProducts,
     createProduct,
     updateProduct,
     deactivateProduct,
