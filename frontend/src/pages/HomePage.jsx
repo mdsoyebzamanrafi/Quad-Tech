@@ -676,23 +676,7 @@ const HomePage = () => {
                             </label>
                         </div>
 
-                        <div className="category-filter-container animate-fade-in">
-                            <button
-                                className={`category-pill ${filters.category === 'all' ? 'active' : ''}`}
-                                onClick={() => updateFilter('category', 'all')}
-                            >
-                                All Categories
-                            </button>
-                            {availableCategories.map((category) => (
-                                <button
-                                    key={category}
-                                    className={`category-pill ${filters.category === category ? 'active' : ''}`}
-                                    onClick={() => updateFilter('category', category)}
-                                >
-                                    {category}
-                                </button>
-                            ))}
-                        </div>
+
 
                         {filters.department === 'fashion' && (
                             <div className="fashion-filter-grid">
